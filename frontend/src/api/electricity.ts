@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { AlertEvent, AlertSettings, Building, CollectionState, ElectricityAnalysis, ElectricityRecord, Floor, NotificationBinding, QuerySaveResult, Room } from '@/types/api'
+import type { AlertEvent, AlertSettings, Building, CollectionState, ElectricityAnalysis, ElectricityRecord, Floor, NotificationBinding, NotificationStatus, QuerySaveResult, Room } from '@/types/api'
 
 const params = (values: Record<string, string | number | undefined>) => `?${new URLSearchParams(Object.entries(values).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()}`
 export const getBuildings = (areaId: string) => request<Building[]>(`/electricity/buildings${params({ area_id: areaId })}`)
@@ -17,4 +17,5 @@ export const getActiveAlerts = (areaId:string, roomId:string) => request<AlertEv
 export const getAlertSettings = () => request<AlertSettings>('/electricity/alerts/settings')
 export const saveAlertSettings = (payload: AlertSettings) => request<AlertSettings>('/electricity/alerts/settings', { method:'PUT', body:JSON.stringify(payload) })
 export const getNotificationBindings = () => request<NotificationBinding[]>('/notification/bindings')
+export const getNotificationStatus = () => request<NotificationStatus>('/notification/status')
 export const saveNotificationBinding = (payload:{provider:'astrbot';platform:'qq';target_id:string;enabled:boolean}) => request<NotificationBinding>('/notification/bindings',{method:'PUT',body:JSON.stringify(payload)})
