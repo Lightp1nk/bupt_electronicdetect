@@ -29,3 +29,26 @@ Run the offline tests with:
 ```powershell
 .\.venv\bin\python.exe -m pytest
 ```
+
+## In-memory FastAPI session
+
+Start the local API server:
+
+```powershell
+.\.venv\bin\python.exe -m uvicorn app.main:app --reload
+```
+
+The app owns one `AuthSessionManager`, which owns at most one `BUPTClient`. A successful `POST /api/v1/auth/login` retains only that client's in-memory HTTP Cookie Jar. Passwords, Cookie values, and CAS data are never stored on disk or kept as manager attributes. Server shutdown and `POST /api/v1/auth/logout` close the client and discard the session.
+
+Available routes:
+
+- `POST /api/v1/auth/login` with `{"username": "...", "password": "..."}`
+- `GET /api/v1/auth/status`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/electricity/buildings?area_id=1` (minimal protected route)
+
+To verify one login supports repeated protected requests, run the server and then:
+
+```powershell
+.\.venv\bin\python.exe scripts\session_probe.py
+```

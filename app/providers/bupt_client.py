@@ -38,6 +38,17 @@ class BUPTClient(BUPTAuthClient):
         except ValueError as exc:
             return ApiResponse.error(ErrorCode.PARSE_ERROR, str(exc))
 
+    async def check_auth_result(self) -> ApiResponse[bool]:
+        """Validate the app session through the confirmed, lightweight ``/part`` call."""
+        result = await self._post_business_api("part", {"areaid": "1"})
+        if result.success:
+            return ApiResponse.ok(True, "session is active")
+        return ApiResponse.error(result.code, result.message)
+
+    async def check_authenticated(self) -> bool:
+        """Boolean compatibility method used by the established authentication flow."""
+        return (await self.check_auth_result()).success
+
     async def get_floors(self, *, area_id: str, building_id: str) -> ApiResponse[list[Floor]]:
         invalid = _require_ids(area_id=area_id, building_id=building_id)
         if invalid:
