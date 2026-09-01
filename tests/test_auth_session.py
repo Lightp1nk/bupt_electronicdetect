@@ -51,9 +51,13 @@ def test_login_replaces_and_closes_old_runtime_client() -> None:
     runtimes = [FakeRuntimeClient(), FakeRuntimeClient()]
     manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtimes.pop(0))  # type: ignore[arg-type]
 
-    assert run(manager.login("user", "secret")).success
+    first = run(manager.bootstrap_login("user", "secret"))
+    assert first.success and first.data is not None
+    assert run(manager.activate_runtime(first.data.session)).success
     old = manager.get_client()
-    assert run(manager.login("user", "secret")).success
+    second = run(manager.bootstrap_login("user", "secret"))
+    assert second.success and second.data is not None
+    assert run(manager.activate_runtime(second.data.session)).success
     assert old is not None and old.closed == 1
     assert manager.get_client() is not old
     assert not hasattr(manager, "_username")
@@ -70,7 +74,7 @@ def test_login_failure_does_not_create_runtime_client() -> None:
         return FakeRuntimeClient()
 
     manager = AuthSessionManager(bootstrap, runtime)  # type: ignore[arg-type]
-    result = run(manager.login("user", "secret"))
+    result = run(manager.bootstrap_login("user", "secret"))
     assert not result.success
     assert manager.get_client() is None
     assert created is False
@@ -79,7 +83,9 @@ def test_login_failure_does_not_create_runtime_client() -> None:
 def test_status_expiry_clears_runtime_client() -> None:
     expired = FakeRuntimeClient(verification=ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired"))
     manager = AuthSessionManager(FakeBootstrapService(), lambda _: expired)  # type: ignore[arg-type]
-    run(manager.login("user", "secret"))
+    logged_in = run(manager.bootstrap_login("user", "secret"))
+    assert logged_in.data is not None
+    run(manager.activate_runtime(logged_in.data.session))
     result = run(manager.status())
     assert result.success and result.data.authenticated is False
     assert result.data.state.value == "SESSION_EXPIRED"
@@ -91,7 +97,9 @@ def test_logout_and_unlogged_access() -> None:
     runtime = FakeRuntimeClient()
     manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtime)  # type: ignore[arg-type]
     assert run(manager.status()).data.authenticated is False
-    run(manager.login("user", "secret"))
+    logged_in = run(manager.bootstrap_login("user", "secret"))
+    assert logged_in.data is not None
+    run(manager.activate_runtime(logged_in.data.session))
     assert run(manager.logout()).success
     assert runtime.closed == 1
 

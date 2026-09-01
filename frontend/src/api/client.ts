@@ -9,7 +9,7 @@ const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${baseUrl}${path}`, { headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) }, ...init })
+    response = await fetch(`${baseUrl}${path}`, { credentials: 'include', headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) }, ...init })
   } catch {
     throw new ApiError('NETWORK_ERROR', '无法连接本地服务，请确认后端已启动。')
   }

@@ -11,7 +11,7 @@ from app.providers.bupt_auth import AuthErrorKind, AuthFailure
 from app.providers.bupt_client import BUPTClient
 from app.schemas.auth import SessionState, SessionStatus
 from app.schemas.common import ApiResponse, ErrorCode
-from app.services.auth_bootstrap import AppBusinessSession, AuthBootstrapService, create_runtime_client
+from app.services.auth_bootstrap import AppBusinessSession, AuthBootstrapService, BootstrapResult, create_runtime_client
 
 
 @dataclass(frozen=True)
@@ -37,19 +37,25 @@ class AuthSessionManager:
         """Return the current client reference; routes should use ``acquire_client`` instead."""
         return self._client
 
-    async def login(self, username: str, password: str) -> ApiResponse[SessionStatus]:
-        """Bootstrap CAS briefly, then retain only a new app-only runtime client."""
+    async def bootstrap_login(self, username: str, password: str) -> ApiResponse[BootstrapResult]:
+        """Authenticate upstream without assigning that result to a local application user."""
+        try:
+            return ApiResponse.ok(await self._bootstrap_service.authenticate(username, password))
+        except AuthFailure as exc:
+            return ApiResponse.error(_login_error_code(exc), "authentication failed")
+        except Exception:
+            return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "authentication could not be completed")
+
+    async def activate_runtime(self, app_session: AppBusinessSession) -> ApiResponse[None]:
+        """Replace the single Phase-A runtime client; user-to-runtime mapping is a later phase."""
         async with self._lock:
-            await self._clear_locked()
             try:
-                bootstrap = await self._bootstrap_service.authenticate(username, password)
-                client = self._runtime_client_factory(bootstrap.session)
-            except AuthFailure as exc:
-                return ApiResponse.error(_login_error_code(exc), "authentication failed")
+                client = self._runtime_client_factory(app_session)
             except Exception:
-                return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "authentication could not be completed")
+                return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "runtime client could not be created")
+            await self._clear_locked()
             self._client = client
-            return ApiResponse.ok(_authenticated_status(), "Authentication successful")
+            return ApiResponse.ok(None, "runtime client activated")
 
     async def logout(self) -> ApiResponse[SessionStatus]:
         """Close only this program's client; it never logs out browser-wide BUPT SSO."""

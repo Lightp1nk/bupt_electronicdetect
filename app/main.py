@@ -15,6 +15,7 @@ from app.api.errors import ApiError
 from app.database.database import SessionLocal, dispose_db, init_db
 from app.schemas.common import ApiResponse, ErrorCode
 from app.services.auth_session import AuthSessionManager
+from app.services.app_session_service import AppSessionConfig
 from app.services.collection_scheduler import CollectionScheduleConfig, start_collection_scheduler
 from app.services.collection_service import CollectionService
 from app.services.monitoring_service import MonitoringService
@@ -23,6 +24,7 @@ from app.services.monitoring_service import MonitoringService
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    app.state.app_session_config = AppSessionConfig.from_environment()
     app.state.auth_session_manager = AuthSessionManager()
     app.state.monitoring_service = MonitoringService(asyncio.Lock())
     schedule_config = CollectionScheduleConfig.from_environment()

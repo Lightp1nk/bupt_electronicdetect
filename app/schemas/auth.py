@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class LoginRequest(BaseModel):
@@ -16,6 +16,15 @@ class SessionState(str, Enum):
     SESSION_EXPIRED = "SESSION_EXPIRED"
 
 
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    bupt_username: str
+    display_name: str | None
+
+
 class SessionStatus(BaseModel):
     authenticated: bool
     state: SessionState
+    user: UserRead | None = None

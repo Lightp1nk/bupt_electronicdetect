@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.api.dependencies import get_authenticated_bupt_client
+from app.api.dependencies import get_authenticated_bupt_client, get_current_user
 from app.database.database import Base, get_db_session
 from app.main import app
 from app.models import alert, collection, electricity  # noqa: F401
@@ -51,6 +51,7 @@ def test_query_requires_login_and_history_reads_local_db(tmp_path: Path) -> None
                 "area_id": "2", "building_id": "b", "floor_id": "f", "room_id": "r"
             })
             app.state.auth_session_manager = LoggedInManager()
+            app.dependency_overrides[get_current_user] = lambda: object()
             queried = await client.post("/api/v1/electricity/query", json={
                 "area_id": "2", "building_id": "b", "floor_id": "f", "room_id": "r", "room_name": "203"
             })

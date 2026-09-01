@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from app.schemas.common import ErrorCode
 
 
-@dataclass(frozen=True)
+@dataclass
 class ApiError(Exception):
     code: ErrorCode
     message: str

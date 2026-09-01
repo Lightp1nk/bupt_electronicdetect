@@ -10,7 +10,8 @@ export interface ApiResponse<T> {
   data: T | null
 }
 
-export interface SessionStatus { authenticated: boolean; state: 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SESSION_EXPIRED' }
+export interface CurrentUser { id: number; bupt_username: string; display_name: string | null }
+export interface SessionStatus { authenticated: boolean; state: 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SESSION_EXPIRED'; user: CurrentUser | null }
 export interface Building { id: string; name: string; area_id: string }
 export interface Floor { id: string; name: string; building_id: string; area_id: string }
 export interface Room { id: string; name: string; floor_id: string; building_id: string; area_id: string }
