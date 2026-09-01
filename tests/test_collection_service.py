@@ -8,11 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database.database import Base
 from app.models import alert, collection, electricity, upstream_session, user  # noqa: F401
+from app.models.collection import CollectionSettings
+from app.models.user import User
 from app.repositories.collection_repository import CollectionRepository
 from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.electricity import CollectionSettingsUpdate, CollectionStatus, ElectricityReading
 from app.services.auth_session import SessionAccessError
-from app.services.collection_scheduler import JOB_ID, CollectionScheduleConfig, start_collection_scheduler
+from app.services.collection_scheduler import JOB_ID, CollectionScheduleConfig, MultiUserCollectionScheduler, start_collection_scheduler
 from app.services.collection_service import CollectionService
 from app.services.monitoring_service import MonitoringService
 
@@ -123,12 +125,82 @@ def test_same_user_collection_runs_are_serialized(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
-def test_scheduler_is_paused_until_phase_d_multi_user_scope(tmp_path: Path) -> None:
+def test_multi_user_scheduler_isolates_failures_skips_disabled_and_limits_concurrency(tmp_path: Path) -> None:
     async def scenario() -> None:
-        engine, service, _ = await service_at(tmp_path / "scheduler.db", FakeManager())
-        scheduler = start_collection_scheduler(service, CollectionScheduleConfig(enabled=True, hour=4, minute=0))
-        assert scheduler.get_job(JOB_ID) is None
+        engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'scheduler.db').as_posix()}")
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        sessions = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+        from app.services.electricity_service import local_now
+        now = local_now()
+        async with sessions() as session:
+            session.add_all([
+                User(id=1, bupt_username="one", created_at=now, last_login_at=now),
+                User(id=2, bupt_username="two", created_at=now, last_login_at=now),
+                User(id=3, bupt_username="three", created_at=now, last_login_at=now),
+            ])
+            session.add_all([
+                CollectionSettings(user_id=1, area_id="2", building_id="b", floor_id="f", room_id="a", enabled=True),
+                CollectionSettings(user_id=2, area_id="2", building_id="b", floor_id="f", room_id="b", enabled=True),
+                CollectionSettings(user_id=3, area_id="2", building_id="b", floor_id="f", room_id="c", enabled=False),
+                # This orphan must never be scheduled, even if SQLite foreign keys are disabled.
+                CollectionSettings(user_id=99, area_id="2", building_id="b", floor_id="f", room_id="orphan", enabled=True),
+            ])
+            await session.commit()
+
+        class RecordingService:
+            def __init__(self) -> None:
+                self.users: list[int] = []
+                self.running = 0
+                self.maximum = 0
+
+            async def run_once(self, user_id: int) -> None:
+                self.users.append(user_id)
+                self.running += 1
+                self.maximum = max(self.maximum, self.running)
+                await asyncio.sleep(0.02)
+                self.running -= 1
+                if user_id == 2:
+                    raise RuntimeError("isolated failure")
+
+        service = RecordingService()
+        multi = MultiUserCollectionScheduler(sessions, service, max_concurrency=1)  # type: ignore[arg-type]
+        await multi.run_all_once()
+        assert service.users == [1, 2]
+        assert service.maximum == 1
+
+        scheduler = start_collection_scheduler(multi, CollectionScheduleConfig(enabled=True, hour=4, minute=0, max_concurrency=3))
+        job = scheduler.get_job(JOB_ID)
+        assert job is not None and job.max_instances == 1 and job.coalesce is True
         scheduler.shutdown(wait=False)
         await engine.dispose()
 
+    asyncio.run(scenario())
+
+
+def test_multi_user_scheduler_honors_configured_parallelism(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'parallel.db').as_posix()}")
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        sessions = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+        from app.services.electricity_service import local_now
+        now = local_now()
+        async with sessions() as session:
+            for user_id in range(1, 5):
+                session.add(User(id=user_id, bupt_username=f"u{user_id}", created_at=now, last_login_at=now))
+                session.add(CollectionSettings(user_id=user_id, area_id="2", building_id="b", floor_id="f", room_id=str(user_id), enabled=True))
+            await session.commit()
+
+        class ParallelService:
+            def __init__(self) -> None: self.running = 0; self.maximum = 0; self.users: list[int] = []
+            async def run_once(self, user_id: int) -> None:
+                self.users.append(user_id); self.running += 1; self.maximum = max(self.maximum, self.running)
+                await asyncio.sleep(0.02); self.running -= 1
+
+        service = ParallelService()
+        await MultiUserCollectionScheduler(sessions, service, max_concurrency=2).run_all_once()  # type: ignore[arg-type]
+        assert sorted(service.users) == [1, 2, 3, 4]
+        assert service.maximum == 2
+        await engine.dispose()
     asyncio.run(scenario())

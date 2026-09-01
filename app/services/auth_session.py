@@ -25,11 +25,7 @@ class SessionAccessError(Exception):
 
 
 class RuntimeSessionManager:
-    """Own reusable app-only clients, isolated by local application user id.
-
-    The scheduler has no user scope until Phase D. Its compatibility path stores
-    only a last-login *user id*, never a global BUPT client.
-    """
+    """Own reusable app-only clients, isolated by explicit local user id."""
 
     def __init__(
         self,
@@ -42,7 +38,6 @@ class RuntimeSessionManager:
     ) -> None:
         self._clients: dict[int, BUPTClient] = {}
         self._locks: dict[int, asyncio.Lock] = {}
-        self._scheduler_user_id: int | None = None  # TODO(Phase D): per-user collection scheduling.
         self._bootstrap_service = bootstrap_service or AuthBootstrapService()
         self._runtime_client_factory = runtime_client_factory or create_runtime_client
         self._runtime_session_loader = runtime_session_loader
@@ -69,7 +64,6 @@ class RuntimeSessionManager:
                 return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "runtime client could not be created")
             await self._remove_locked(user_id)
             self._clients[user_id] = client
-            self._scheduler_user_id = user_id
             return ApiResponse.ok(None, "runtime client registered")
 
     async def get_client(self, user_id: int) -> BUPTClient:
@@ -89,48 +83,38 @@ class RuntimeSessionManager:
         lock = await self._user_lock(user_id)
         async with lock:
             await self._remove_locked(user_id)
-            if self._scheduler_user_id == user_id:
-                self._scheduler_user_id = None
 
     async def close_all(self) -> None:
         """Application-shutdown-only cleanup for every managed runtime client."""
         clients, self._clients = list(self._clients.values()), {}
-        self._scheduler_user_id = None
         await asyncio.gather(*(client.close() for client in clients))
-
-    def has_scheduler_client(self) -> bool:
-        """Temporary Phase-D compatibility status check without exposing a Client."""
-        return self._scheduler_user_id is not None and self._scheduler_user_id in self._clients
 
     def has_client(self, user_id: int) -> bool:
         """Report whether this user's Runtime Client is currently live in this process."""
         return user_id in self._clients
 
     @asynccontextmanager
-    async def acquire_client(self, user_id: int | None = None) -> AsyncIterator[BUPTClient]:
+    async def acquire_client(self, user_id: int) -> AsyncIterator[BUPTClient]:
         """Lease one user runtime exclusively while it performs an upstream request."""
-        resolved_user_id = user_id if user_id is not None else self._scheduler_user_id
-        if resolved_user_id is None:
-            raise SessionAccessError(ErrorCode.AUTH_REQUIRED, "log in before accessing electricity data")
-        lock = await self._user_lock(resolved_user_id)
+        lock = await self._user_lock(user_id)
         async with lock:
-            client = await self._get_or_create_locked(resolved_user_id)
+            client = await self._get_or_create_locked(user_id)
             verification = await client.check_auth_result()
             if not verification.success:
                 if verification.code == ErrorCode.SESSION_EXPIRED:
-                    await self._invalidate_locked(resolved_user_id)
+                    await self._invalidate_locked(user_id)
                     raise SessionAccessError(ErrorCode.SESSION_EXPIRED, "session expired; please log in again")
                 raise SessionAccessError(verification.code, "session could not be checked")
-            await self._mark_validated(resolved_user_id)
+            await self._mark_validated(user_id)
             try:
                 yield client
             finally:
                 post_verification = await client.check_auth_result()
                 if post_verification.success:
-                    await self._mark_validated(resolved_user_id)
-                    await self._persist_runtime_cookies(resolved_user_id, client)
+                    await self._mark_validated(user_id)
+                    await self._persist_runtime_cookies(user_id, client)
                 elif post_verification.code == ErrorCode.SESSION_EXPIRED:
-                    await self._invalidate_locked(resolved_user_id)
+                    await self._invalidate_locked(user_id)
 
     async def _user_lock(self, user_id: int) -> asyncio.Lock:
         # This contains no await, so one event-loop turn creates each lock atomically.
@@ -157,8 +141,6 @@ class RuntimeSessionManager:
 
     async def _invalidate_locked(self, user_id: int) -> None:
         await self._remove_locked(user_id)
-        if self._scheduler_user_id == user_id:
-            self._scheduler_user_id = None
         if self._runtime_expiry_marker is not None:
             await self._runtime_expiry_marker(user_id)
 

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.collection import CollectionSettings
+from app.models.user import User
 
 
 class CollectionRepository:
@@ -16,6 +17,26 @@ class CollectionRepository:
 
     async def get_settings(self, user_id: int) -> CollectionSettings | None:
         return await self._session.scalar(select(CollectionSettings).where(CollectionSettings.user_id == user_id))
+
+    async def list_enabled_user_ids(self) -> list[int]:
+        """Return only real users with a complete, enabled monitored room.
+
+        The legacy unassigned table is intentionally never referenced here.
+        Joining users also prevents an orphaned SQLite row from being scheduled.
+        """
+        statement = (
+            select(CollectionSettings.user_id)
+            .join(User, User.id == CollectionSettings.user_id)
+            .where(
+                CollectionSettings.enabled.is_(True),
+                CollectionSettings.area_id.is_not(None),
+                CollectionSettings.building_id.is_not(None),
+                CollectionSettings.floor_id.is_not(None),
+                CollectionSettings.room_id.is_not(None),
+            )
+            .order_by(CollectionSettings.user_id)
+        )
+        return list((await self._session.scalars(statement)).all())
 
     async def update_settings(
         self, user_id: int, *, area_id: str, area_name: str, building_id: str, building_name: str,

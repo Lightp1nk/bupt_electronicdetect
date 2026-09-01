@@ -54,7 +54,22 @@ The app uses a browser HttpOnly application-session Cookie and a reusable Runtim
 $env:APP_UPSTREAM_SESSION_KEY = .\.venv\bin\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-After a successful BUPT CAS login, only the app-domain business Cookie payload is encrypted and stored per local user. Passwords, CAS Cookies, tickets, and raw application-session tokens are never persisted. Browser logout revokes only the current local application session; it does not delete the encrypted upstream authorization. Server shutdown closes every transient Runtime Client. Automatic collection is intentionally paused until Phase D adds multi-user scheduling.
+After a successful BUPT CAS login, only the app-domain business Cookie payload is encrypted and stored per local user. Passwords, CAS Cookies, tickets, and raw application-session tokens are never persisted. Browser logout revokes only the current local application session; it does not delete the encrypted upstream authorization. Server shutdown closes every transient Runtime Client.
+
+## Multi-user automatic collection
+
+One `AsyncIOScheduler` Cron job runs at `04:00 Asia/Shanghai` by default. It enumerates only enabled, fully configured user collection settings and calls the existing user-scoped collection flow with bounded concurrency. This course-project implementation is intentionally single-process and single-worker; multiple application workers would register duplicate jobs.
+
+Optional environment configuration:
+
+```powershell
+$env:COLLECTION_ENABLED = "true"
+$env:COLLECTION_HOUR = "4"
+$env:COLLECTION_MINUTE = "0"
+$env:COLLECTION_MAX_CONCURRENCY = "3"
+```
+
+The older `ELECTRICITY_COLLECTION_*` variables remain accepted for compatibility. A missed run is eligible for only a five-minute grace period, so starting the server much later in the morning does not run an obsolete collection job.
 
 Available routes:
 

@@ -28,7 +28,7 @@ class FakeUpstreamClient:
 
 class LoggedInManager:
     @asynccontextmanager
-    async def acquire_client(self, user_id: int | None = None):
+    async def acquire_client(self, user_id: int):
         yield FakeUpstreamClient()
 
 

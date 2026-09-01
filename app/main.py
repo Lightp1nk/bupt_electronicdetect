@@ -17,7 +17,7 @@ from app.schemas.common import ApiResponse, ErrorCode
 from app.services.auth_session import AuthSessionManager
 from app.services.upstream_session_service import UpstreamSessionService
 from app.services.app_session_service import AppSessionConfig
-from app.services.collection_scheduler import CollectionScheduleConfig, start_collection_scheduler
+from app.services.collection_scheduler import CollectionScheduleConfig, MultiUserCollectionScheduler, start_collection_scheduler
 from app.services.collection_service import CollectionService
 from app.services.monitoring_service import MonitoringService
 from app.services.notification_providers import AstrBotNotifier
@@ -40,7 +40,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         SessionLocal, app.state.auth_session_manager, app.state.monitoring_service,
         enabled=schedule_config.enabled, hour=schedule_config.hour, minute=schedule_config.minute,
     )
-    app.state.collection_scheduler = start_collection_scheduler(app.state.collection_service, schedule_config)
+    app.state.multi_user_collection_scheduler = MultiUserCollectionScheduler(
+        SessionLocal, app.state.collection_service, max_concurrency=schedule_config.max_concurrency,
+    )
+    app.state.collection_scheduler = start_collection_scheduler(app.state.multi_user_collection_scheduler, schedule_config)
     try:
         yield
     finally:
