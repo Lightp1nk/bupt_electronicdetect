@@ -5,7 +5,7 @@ import { ApiError } from '@/api/client'
 import { getBuildings, getFloors, getRooms } from '@/api/electricity'
 import type { Building, Floor, Room } from '@/types/api'
 
-export interface RoomSelection { areaId: string; building: Building; floor: Floor; room: Room }
+export interface RoomSelection { areaId: string; areaName: string; building: Building; floor: Floor; room: Room }
 withDefaults(defineProps<{ actionLabel?: string }>(), { actionLabel: '刷新' })
 const emit = defineEmits<{ query: [selection: RoomSelection]; error: [message: string] }>()
 const areas = [{ id: '1', name: '西土城' }, { id: '2', name: '沙河' }]
@@ -38,7 +38,8 @@ function refresh() {
   const building = buildings.value.find((item) => item.id === buildingId.value)
   const floor = floors.value.find((item) => item.id === floorId.value)
   const room = rooms.value.find((item) => item.id === roomId.value)
-  if (areaId.value && building && floor && room) emit('query', { areaId: areaId.value, building, floor, room })
+  const area = areas.find((item) => item.id === areaId.value)
+  if (area && building && floor && room) emit('query', { areaId: area.id, areaName: area.name, building, floor, room })
 }
 defineExpose({ refresh })
 </script>

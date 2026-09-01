@@ -117,6 +117,7 @@ class CollectionStatus(str, Enum):
 
 class CollectionSettingsUpdate(BaseModel):
     area_id: str = Field(min_length=1)
+    area_name: str = Field(min_length=1)
     building_id: str = Field(min_length=1)
     building_name: str = Field(min_length=1)
     floor_id: str = Field(min_length=1)
@@ -130,6 +131,7 @@ class CollectionStatusRead(BaseModel):
     scheduled_time: str
     authenticated: bool
     area_id: str | None = None
+    area_name: str | None = None
     building_id: str | None = None
     building_name: str | None = None
     floor_id: str | None = None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-import asyncio
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request

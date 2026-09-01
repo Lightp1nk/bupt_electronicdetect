@@ -11,6 +11,16 @@ python -m venv .venv
 
 On this MSYS Python installation, upstream Pydantic v2 wheels are not published for its platform. Install the corresponding MSYS packages first (Pydantic, pytest, FastAPI and Uvicorn), then create the virtual environment with system packages enabled, or use a standard CPython environment where `pip install -r requirements.txt` succeeds.
 
+## Database migrations
+
+Database structure is versioned with Alembic. Startup creates only missing base tables, then applies versioned migrations. To run migrations manually:
+
+```powershell
+.\.venv\bin\alembic.exe upgrade head
+```
+
+The C1 migration preserves any former singleton `collection_settings` table as `collection_settings_legacy_unassigned`; it is not automatically assigned to any user.
+
 ## Probes
 
 ```powershell
@@ -38,13 +48,13 @@ Start the local API server:
 .\.venv\bin\python.exe -m uvicorn app.main:app --reload
 ```
 
-The app uses a browser HttpOnly application-session Cookie and one transitional, reusable Runtime `BUPTClient`. Before starting the API, configure a valid Fernet key; the server never generates a fallback key or stores upstream Cookies in plaintext:
+The app uses a browser HttpOnly application-session Cookie and a reusable Runtime `BUPTClient` per local user. Before starting the API, configure a valid Fernet key; the server never generates a fallback key or stores upstream Cookies in plaintext:
 
 ```powershell
 $env:APP_UPSTREAM_SESSION_KEY = .\.venv\bin\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-After a successful BUPT CAS login, only the app-domain business Cookie payload is encrypted and stored per local user. Passwords, CAS Cookies, tickets, and raw application-session tokens are never persisted. Browser logout revokes only the current local application session; it does not delete the encrypted upstream authorization. Server shutdown closes the transient Runtime Client.
+After a successful BUPT CAS login, only the app-domain business Cookie payload is encrypted and stored per local user. Passwords, CAS Cookies, tickets, and raw application-session tokens are never persisted. Browser logout revokes only the current local application session; it does not delete the encrypted upstream authorization. Server shutdown closes every transient Runtime Client. Automatic collection is intentionally paused until Phase D adds multi-user scheduling.
 
 Available routes:
 

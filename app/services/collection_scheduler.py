@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-
 from app.services.collection_service import CollectionService
 
 
@@ -32,17 +30,9 @@ class CollectionScheduleConfig:
 
 
 def start_collection_scheduler(service: CollectionService, config: CollectionScheduleConfig) -> AsyncIOScheduler:
-    """Schedule one Beijing-time job. V1 assumes one FastAPI process and one worker."""
+    """Start the scheduler without a collection job until Phase D adds user scope."""
     scheduler = AsyncIOScheduler(timezone=BEIJING_TZ)
-    if config.enabled:
-        scheduler.add_job(
-            service.run_once,
-            trigger=CronTrigger(hour=config.hour, minute=config.minute, timezone=BEIJING_TZ),
-            id=JOB_ID,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=15 * 60,
-        )
+    # TODO(Phase D): enumerate user-scoped collection settings and register per-user jobs.
+    # A no-user job could select the wrong user's room, so C1 intentionally registers none.
     scheduler.start()
     return scheduler

@@ -22,7 +22,7 @@ async function loadCollection() { try { collection.value = await getCollectionSe
 async function saveSelection(selection: RoomSelection) {
   error.value = ''
   try {
-    collection.value = await saveCollectionSettings({ area_id: selection.areaId, building_id: selection.building.id, building_name: selection.building.name, floor_id: selection.floor.id, floor_name: selection.floor.name, room_id: selection.room.id, room_name: selection.room.name })
+    collection.value = await saveCollectionSettings({ area_id: selection.areaId, area_name: selection.areaName, building_id: selection.building.id, building_name: selection.building.name, floor_id: selection.floor.id, floor_name: selection.floor.name, room_id: selection.room.id, room_name: selection.room.name })
     save(selection); emit('saved')
   } catch (cause) { error.value = cause instanceof ApiError ? `自动采集配置保存失败：${cause.message}` : '自动采集配置保存失败，请重试。' }
 }

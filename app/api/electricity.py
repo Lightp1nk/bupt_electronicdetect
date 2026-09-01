@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import _status_code
-from app.api.dependencies import get_authenticated_bupt_client
+from app.api.dependencies import get_authenticated_bupt_client, get_current_user
+from app.models.user import User
 from app.database.database import get_db_session
 from app.providers.bupt_client import BUPTClient
 from app.schemas.common import ApiResponse
@@ -132,37 +133,37 @@ async def analysis(
 
 
 @router.get("/collection/settings", response_model=ApiResponse[CollectionStatusRead])
-async def collection_settings(request: Request, response: Response) -> ApiResponse[CollectionStatusRead]:
-    result = await _collection_service(request).get_status()
+async def collection_settings(request: Request, response: Response, current_user: User = Depends(get_current_user)) -> ApiResponse[CollectionStatusRead]:
+    result = await _collection_service(request).get_status(current_user.id)
     response.status_code = _status_code(result.code)
     return result
 
 
 @router.put("/collection/settings", response_model=ApiResponse[CollectionStatusRead])
 async def save_collection_settings(
-    payload: CollectionSettingsUpdate, request: Request, response: Response,
+    payload: CollectionSettingsUpdate, request: Request, response: Response, current_user: User = Depends(get_current_user),
 ) -> ApiResponse[CollectionStatusRead]:
-    result = await _collection_service(request).save_settings(payload)
+    result = await _collection_service(request).save_settings(current_user.id, payload)
     response.status_code = _status_code(result.code)
     return result
 
 
 @router.delete("/collection/settings", response_model=ApiResponse[CollectionStatusRead])
-async def clear_collection_settings(request: Request, response: Response) -> ApiResponse[CollectionStatusRead]:
-    result = await _collection_service(request).clear_settings()
+async def clear_collection_settings(request: Request, response: Response, current_user: User = Depends(get_current_user)) -> ApiResponse[CollectionStatusRead]:
+    result = await _collection_service(request).clear_settings(current_user.id)
     response.status_code = _status_code(result.code)
     return result
 
 
 @router.get("/collection/status", response_model=ApiResponse[CollectionStatusRead])
-async def collection_status(request: Request, response: Response) -> ApiResponse[CollectionStatusRead]:
-    result = await _collection_service(request).get_status()
+async def collection_status(request: Request, response: Response, current_user: User = Depends(get_current_user)) -> ApiResponse[CollectionStatusRead]:
+    result = await _collection_service(request).get_status(current_user.id)
     response.status_code = _status_code(result.code)
     return result
 
 
 @router.post("/collection/run", response_model=ApiResponse[CollectionStatusRead])
-async def run_collection(request: Request, response: Response) -> ApiResponse[CollectionStatusRead]:
-    result = await _collection_service(request).run_once()
+async def run_collection(request: Request, response: Response, current_user: User = Depends(get_current_user)) -> ApiResponse[CollectionStatusRead]:
+    result = await _collection_service(request).run_once(current_user.id)
     response.status_code = _status_code(result.code)
     return result

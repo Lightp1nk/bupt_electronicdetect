@@ -3,6 +3,7 @@ import type { RoomSelection } from '@/components/RoomSelector.vue'
 
 export interface SavedDormitory {
   areaId: string
+  areaName?: string
   building: { id: string; name: string }
   floor: { id: string; name: string }
   room: { id: string; name: string }
@@ -21,6 +22,7 @@ function load(): SavedDormitory | null {
 function save(selection: RoomSelection) {
   const value: SavedDormitory = {
     areaId: selection.areaId,
+    areaName: selection.areaName,
     building: { id: selection.building.id, name: selection.building.name },
     floor: { id: selection.floor.id, name: selection.floor.name },
     room: { id: selection.room.id, name: selection.room.name },

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -23,11 +26,18 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSe
 
 
 async def init_db() -> None:
-    """Create initial tables for this course-project stage."""
+    """Bootstrap fresh tables, then apply versioned structural migrations."""
     from app.models import alert, collection, electricity, upstream_session, user  # noqa: F401 -- registers ORM metadata
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+    await asyncio.to_thread(command.upgrade, _alembic_config(), "head")
+
+
+def _alembic_config() -> Config:
+    config = Config(str(Path("alembic.ini").resolve()))
+    config.set_main_option("sqlalchemy.url", "sqlite:///./data/electricity.db")
+    return config
 
 
 async def dispose_db() -> None:

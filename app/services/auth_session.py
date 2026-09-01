@@ -102,6 +102,10 @@ class RuntimeSessionManager:
         """Temporary Phase-D compatibility status check without exposing a Client."""
         return self._scheduler_user_id is not None and self._scheduler_user_id in self._clients
 
+    def has_client(self, user_id: int) -> bool:
+        """Report whether this user's Runtime Client is currently live in this process."""
+        return user_id in self._clients
+
     @asynccontextmanager
     async def acquire_client(self, user_id: int | None = None) -> AsyncIterator[BUPTClient]:
         """Lease one user runtime exclusively while it performs an upstream request."""

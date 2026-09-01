@@ -10,7 +10,7 @@ export const getHistory = (areaId: string, roomId: string, limit = 90) => reques
 export const getLatest = (areaId: string, roomId: string) => request<ElectricityRecord>(`/electricity/latest/${encodeURIComponent(roomId)}${params({ area_id: areaId })}`)
 export const getAnalysis = (areaId: string, roomId: string) => request<ElectricityAnalysis>(`/electricity/analysis/${encodeURIComponent(roomId)}${params({ area_id: areaId })}`)
 export const getCollectionSettings = () => request<CollectionState>('/electricity/collection/settings')
-export const saveCollectionSettings = (payload: { area_id: string; building_id: string; building_name: string; floor_id: string; floor_name: string; room_id: string; room_name: string }) => request<CollectionState>('/electricity/collection/settings', { method: 'PUT', body: JSON.stringify(payload) })
+export const saveCollectionSettings = (payload: { area_id: string; area_name: string; building_id: string; building_name: string; floor_id: string; floor_name: string; room_id: string; room_name: string }) => request<CollectionState>('/electricity/collection/settings', { method: 'PUT', body: JSON.stringify(payload) })
 export const clearCollectionSettings = () => request<CollectionState>('/electricity/collection/settings', { method: 'DELETE' })
 export const runCollection = () => request<CollectionState>('/electricity/collection/run', { method: 'POST' })
 export const getActiveAlerts = (areaId:string, roomId:string) => request<AlertEvent[]>(`/electricity/alerts/active${params({area_id:areaId,room_id:roomId})}`)

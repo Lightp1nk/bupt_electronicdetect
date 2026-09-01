@@ -44,7 +44,7 @@ export interface ElectricityAnalysis {
 export type CollectionStatus = 'never_run' | 'success' | 'no_room_configured' | 'not_authenticated' | 'session_expired' | 'upstream_not_updated' | 'failed' | 'already_running'
 export interface CollectionState {
   enabled: boolean; scheduled_time: string; authenticated: boolean
-  area_id: string | null; building_id: string | null; building_name: string | null
+  area_id: string | null; area_name: string | null; building_id: string | null; building_name: string | null
   floor_id: string | null; floor_name: string | null; room_id: string | null; room_name: string | null
   status: CollectionStatus; message: string | null
   last_attempt_time: string | null; last_success_time: string | null; last_source_time: string | null

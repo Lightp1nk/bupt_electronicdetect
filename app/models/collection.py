@@ -1,10 +1,10 @@
-"""Single-user persisted configuration and status for automatic collection."""
+"""Per-user persisted configuration and status for automatic collection."""
 
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.database import Base
@@ -12,10 +12,12 @@ from app.database.database import Base
 
 class CollectionSettings(Base):
     __tablename__ = "collection_settings"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_collection_settings_user_id"),)
 
-    # This application is deliberately single-user: every read and write uses id=1.
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     area_id: Mapped[str | None] = mapped_column(String(32))
+    area_name: Mapped[str | None] = mapped_column(String(255))
     building_id: Mapped[str | None] = mapped_column(String(128))
     building_name: Mapped[str | None] = mapped_column(String(255))
     floor_id: Mapped[str | None] = mapped_column(String(128))
