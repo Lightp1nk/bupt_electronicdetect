@@ -4,22 +4,41 @@ import asyncio
 
 import pytest
 
-import app.services.auth_session as session_module
+from app.providers.bupt_auth import AuthErrorKind, AuthFailure
 from app.schemas.common import ApiResponse, ErrorCode
+from app.services.auth_bootstrap import AppBusinessCookie, AppBusinessSession, BootstrapResult
 from app.services.auth_session import AuthSessionManager, SessionAccessError
 
 
-class FakeClient:
-    def __init__(self, *, login_error: Exception | None = None, verification: ApiResponse[bool] | None = None) -> None:
-        self.login_error = login_error
+def run(coro: object) -> object:
+    return asyncio.run(coro)  # type: ignore[arg-type]
+
+
+def business_session() -> AppBusinessSession:
+    return AppBusinessSession(
+        (
+            AppBusinessCookie("eai-sess", "test-session", "app.bupt.edu.cn", "/", None, True),
+            AppBusinessCookie("UUkey", "test-key", "app.bupt.edu.cn", "/", None, False),
+        )
+    )
+
+
+class FakeBootstrapService:
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.error = error
+        self.calls = 0
+
+    async def authenticate(self, username: str, password: str) -> BootstrapResult:
+        self.calls += 1
+        if self.error:
+            raise self.error
+        return BootstrapResult(username=username, session=business_session())
+
+
+class FakeRuntimeClient:
+    def __init__(self, *, verification: ApiResponse[bool] | None = None) -> None:
         self.verification = verification or ApiResponse.ok(True)
         self.closed = 0
-        self.login_calls = 0
-
-    async def login(self, username: str, password: str) -> None:
-        self.login_calls += 1
-        if self.login_error:
-            raise self.login_error
 
     async def check_auth_result(self) -> ApiResponse[bool]:
         return self.verification
@@ -28,38 +47,38 @@ class FakeClient:
         self.closed += 1
 
 
-def run(coro: object) -> object:
-    return asyncio.run(coro)  # type: ignore[arg-type]
-
-
-def test_login_replaces_and_closes_old_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    clients = [FakeClient(), FakeClient()]
-    monkeypatch.setattr(session_module, "BUPTClient", lambda: clients.pop(0))
-    manager = AuthSessionManager()
+def test_login_replaces_and_closes_old_runtime_client() -> None:
+    runtimes = [FakeRuntimeClient(), FakeRuntimeClient()]
+    manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtimes.pop(0))  # type: ignore[arg-type]
 
     assert run(manager.login("user", "secret")).success
     old = manager.get_client()
     assert run(manager.login("user", "secret")).success
-    assert old.closed == 1
+    assert old is not None and old.closed == 1
     assert manager.get_client() is not old
     assert not hasattr(manager, "_username")
     assert not hasattr(manager, "_password")
 
 
-def test_login_failure_closes_failed_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    failed = FakeClient(login_error=RuntimeError("no details exposed"))
-    monkeypatch.setattr(session_module, "BUPTClient", lambda: failed)
-    manager = AuthSessionManager()
+def test_login_failure_does_not_create_runtime_client() -> None:
+    bootstrap = FakeBootstrapService(error=AuthFailure(AuthErrorKind.CAPTCHA_REQUIRED, "login"))
+    created = False
+
+    def runtime(_: AppBusinessSession) -> FakeRuntimeClient:
+        nonlocal created
+        created = True
+        return FakeRuntimeClient()
+
+    manager = AuthSessionManager(bootstrap, runtime)  # type: ignore[arg-type]
     result = run(manager.login("user", "secret"))
     assert not result.success
     assert manager.get_client() is None
-    assert failed.closed == 1
+    assert created is False
 
 
-def test_status_expiry_clears_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    expired = FakeClient(verification=ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired"))
-    monkeypatch.setattr(session_module, "BUPTClient", lambda: expired)
-    manager = AuthSessionManager()
+def test_status_expiry_clears_runtime_client() -> None:
+    expired = FakeRuntimeClient(verification=ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired"))
+    manager = AuthSessionManager(FakeBootstrapService(), lambda _: expired)  # type: ignore[arg-type]
     run(manager.login("user", "secret"))
     result = run(manager.status())
     assert result.success and result.data.authenticated is False
@@ -68,14 +87,13 @@ def test_status_expiry_clears_client(monkeypatch: pytest.MonkeyPatch) -> None:
     assert expired.closed == 1
 
 
-def test_logout_and_unlogged_access(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = FakeClient()
-    monkeypatch.setattr(session_module, "BUPTClient", lambda: fake)
-    manager = AuthSessionManager()
+def test_logout_and_unlogged_access() -> None:
+    runtime = FakeRuntimeClient()
+    manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtime)  # type: ignore[arg-type]
     assert run(manager.status()).data.authenticated is False
     run(manager.login("user", "secret"))
     assert run(manager.logout()).success
-    assert fake.closed == 1
+    assert runtime.closed == 1
 
     async def access() -> None:
         async with manager.acquire_client():

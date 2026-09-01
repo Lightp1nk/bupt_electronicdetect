@@ -5,12 +5,13 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import AsyncIterator, Callable
 
 from app.providers.bupt_auth import AuthErrorKind, AuthFailure
 from app.providers.bupt_client import BUPTClient
 from app.schemas.auth import SessionState, SessionStatus
 from app.schemas.common import ApiResponse, ErrorCode
+from app.services.auth_bootstrap import AppBusinessSession, AuthBootstrapService, create_runtime_client
 
 
 @dataclass(frozen=True)
@@ -22,26 +23,30 @@ class SessionAccessError(Exception):
 class AuthSessionManager:
     """Own one in-memory BUPT session; credentials are never retained as state."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        bootstrap_service: AuthBootstrapService | None = None,
+        runtime_client_factory: Callable[[AppBusinessSession], BUPTClient] | None = None,
+    ) -> None:
         self._client: BUPTClient | None = None
         self._lock = asyncio.Lock()
+        self._bootstrap_service = bootstrap_service or AuthBootstrapService()
+        self._runtime_client_factory = runtime_client_factory or create_runtime_client
 
     def get_client(self) -> BUPTClient | None:
         """Return the current client reference; routes should use ``acquire_client`` instead."""
         return self._client
 
     async def login(self, username: str, password: str) -> ApiResponse[SessionStatus]:
-        """Replace any prior client only after this authentication succeeds."""
+        """Bootstrap CAS briefly, then retain only a new app-only runtime client."""
         async with self._lock:
             await self._clear_locked()
-            client = BUPTClient()
             try:
-                await client.login(username, password)
+                bootstrap = await self._bootstrap_service.authenticate(username, password)
+                client = self._runtime_client_factory(bootstrap.session)
             except AuthFailure as exc:
-                await client.close()
                 return ApiResponse.error(_login_error_code(exc), "authentication failed")
             except Exception:
-                await client.close()
                 return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "authentication could not be completed")
             self._client = client
             return ApiResponse.ok(_authenticated_status(), "Authentication successful")

@@ -3,11 +3,9 @@ from __future__ import annotations
 import asyncio
 
 import httpx
-import pytest
-
-import app.services.auth_session as session_module
 from app.main import app
 from app.schemas.common import ApiResponse
+from app.services.auth_bootstrap import AppBusinessCookie, AppBusinessSession, BootstrapResult
 from app.services.auth_session import AuthSessionManager
 from app.services.collection_scheduler import JOB_ID
 
@@ -38,12 +36,28 @@ class FakeClient:
         self.closed += 1
 
 
-def test_auth_routes_reuse_then_clear_session(monkeypatch: pytest.MonkeyPatch) -> None:
+class FakeBootstrapService:
+    async def authenticate(self, username: str, password: str) -> BootstrapResult:
+        return BootstrapResult(
+            username=username,
+            session=AppBusinessSession(
+                (
+                    AppBusinessCookie("eai-sess", "test-session", "app.bupt.edu.cn", "/", None, True),
+                    AppBusinessCookie("UUkey", "test-key", "app.bupt.edu.cn", "/", None, False),
+                )
+            ),
+        )
+
+
+def fake_manager() -> AuthSessionManager:
+    return AuthSessionManager(FakeBootstrapService(), lambda _: FakeClient())  # type: ignore[arg-type]
+
+
+def test_auth_routes_reuse_then_clear_session() -> None:
     FakeClient.instances.clear()
-    monkeypatch.setattr(session_module, "BUPTClient", FakeClient)
 
     async def scenario() -> None:
-        app.state.auth_session_manager = AuthSessionManager()
+        app.state.auth_session_manager = fake_manager()
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             before = await client.get("/api/v1/auth/status")
@@ -70,15 +84,15 @@ def test_auth_routes_reuse_then_clear_session(monkeypatch: pytest.MonkeyPatch) -
     assert len(FakeClient.instances) == 1
 
 
-def test_lifespan_shutdown_closes_client(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_lifespan_shutdown_closes_client() -> None:
     FakeClient.instances.clear()
-    monkeypatch.setattr(session_module, "BUPTClient", FakeClient)
 
     async def scenario() -> None:
         async with app.router.lifespan_context(app):
             scheduler = app.state.collection_scheduler
             assert scheduler.get_job(JOB_ID) is not None
             assert len([job for job in scheduler.get_jobs() if job.id == JOB_ID]) == 1
+            app.state.auth_session_manager = fake_manager()
             result = await app.state.auth_session_manager.login("user", "secret")
             assert result.success
 

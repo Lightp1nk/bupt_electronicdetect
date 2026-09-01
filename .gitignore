@@ -11,3 +11,4 @@ data/*.db
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+experiments/.runtime_app_session.json
