@@ -9,7 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.providers.bupt_auth import AuthFailure, BUPTAuthClient
+from app.providers.bupt_auth import AuthFailure
+from app.providers.bupt_client import BUPTClient
 
 
 def prompt_credentials() -> tuple[str, str]:
@@ -19,7 +20,7 @@ def prompt_credentials() -> tuple[str, str]:
 
 async def main() -> int:
     try:
-        async with BUPTAuthClient(credential_provider=prompt_credentials, trace=print) as auth:
+        async with BUPTClient(credential_provider=prompt_credentials, trace=print) as auth:
             result = await auth.login()
             print("[OK] chong returned 200")
             print("[OK] /part returned e=0")

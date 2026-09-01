@@ -1,0 +1,40 @@
+"""Shared result envelope for provider operations."""
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import Generic, TypeVar
+
+from pydantic import BaseModel
+
+
+class ErrorCode(str, Enum):
+    OK = "OK"
+    INVALID_ARGUMENT = "INVALID_ARGUMENT"
+    AUTH_REQUIRED = "AUTH_REQUIRED"
+    SESSION_EXPIRED = "SESSION_EXPIRED"
+    NETWORK_ERROR = "NETWORK_ERROR"
+    TIMEOUT = "TIMEOUT"
+    UPSTREAM_ERROR = "UPSTREAM_ERROR"
+    PARSE_ERROR = "PARSE_ERROR"
+    NOT_FOUND = "NOT_FOUND"
+    BUSINESS_ERROR = "BUSINESS_ERROR"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
+T = TypeVar("T")
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    success: bool
+    code: ErrorCode
+    message: str
+    data: T | None = None
+
+    @classmethod
+    def ok(cls, data: T, message: str = "操作成功") -> "ApiResponse[T]":
+        return cls(success=True, code=ErrorCode.OK, message=message, data=data)
+
+    @classmethod
+    def error(cls, code: ErrorCode, message: str) -> "ApiResponse[T]":
+        return cls(success=False, code=code, message=message)

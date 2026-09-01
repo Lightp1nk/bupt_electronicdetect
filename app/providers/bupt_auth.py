@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Awaitable
+from typing import Any, Awaitable
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -82,8 +82,9 @@ class BUPTAuthClient:
         credential_provider: CredentialProvider | None = None,
         trace: TraceCallback | None = None,
         timeout: float = 20.0,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self._client = httpx.AsyncClient(follow_redirects=False, timeout=timeout)
+        self._client = httpx.AsyncClient(follow_redirects=False, timeout=timeout, transport=transport)
         self._credential_provider = credential_provider
         self._trace = trace
 
@@ -185,7 +186,7 @@ class BUPTAuthClient:
             supplied = await supplied  # type: ignore[assignment,misc]
         return supplied  # type: ignore[return-value]
 
-    async def _send(self, method: str, url: str, *, stage: str, **kwargs: object) -> httpx.Response:
+    async def _send(self, method: str, url: str, *, stage: str, **kwargs: Any) -> httpx.Response:
         try:
             response = await self._client.request(method, url, **kwargs)
             location = response.headers.get("location")

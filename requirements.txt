@@ -1,2 +1,4 @@
 httpx[socks]>=0.28,<0.29
 beautifulsoup4>=4.15,<5
+pydantic>=2.0,<3
+pytest>=8,<10
