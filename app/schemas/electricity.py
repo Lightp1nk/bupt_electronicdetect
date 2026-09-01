@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ElectricityReading(BaseModel):
@@ -141,3 +141,30 @@ class CollectionStatusRead(BaseModel):
     last_attempt_time: datetime | None = None
     last_success_time: datetime | None = None
     last_source_time: datetime | None = None
+
+class AlertType(str, Enum): LOW_BALANCE = "low_balance"; LOW_REMAINING_DAYS = "low_remaining_days"
+class AlertLevel(str, Enum): WARNING = "warning"; CRITICAL = "critical"
+class AlertEventStatus(str, Enum): ACTIVE = "active"; RESOLVED = "resolved"
+
+class AlertSettingsUpdate(BaseModel):
+    enabled: bool
+    low_balance_enabled: bool
+    balance_warning_threshold: float = Field(gt=0)
+    balance_critical_threshold: float = Field(gt=0)
+    low_remaining_days_enabled: bool
+    remaining_days_warning_threshold: float = Field(gt=0)
+    remaining_days_critical_threshold: float = Field(gt=0)
+    @model_validator(mode="after")
+    def thresholds_are_ordered(self) -> "AlertSettingsUpdate":
+        if self.balance_critical_threshold >= self.balance_warning_threshold or self.remaining_days_critical_threshold >= self.remaining_days_warning_threshold:
+            raise ValueError("critical threshold must be lower than warning threshold")
+        return self
+
+class AlertSettingsRead(AlertSettingsUpdate): pass
+
+class AlertEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int; area_id: str; room_id: str; building_name: str | None = None; floor_name: str | None = None; room_name: str | None = None
+    alert_type: AlertType; level: AlertLevel; status: AlertEventStatus; title: str; message: str
+    trigger_value: float; threshold_value: float; source_time: datetime | None = None
+    first_triggered_at: datetime; last_seen_at: datetime; resolved_at: datetime | None = None; created_at: datetime; updated_at: datetime

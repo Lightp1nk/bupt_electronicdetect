@@ -24,7 +24,7 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSe
 
 async def init_db() -> None:
     """Create initial tables for this course-project stage."""
-    from app.models import collection, electricity  # noqa: F401 -- registers ORM metadata
+    from app.models import alert, collection, electricity  # noqa: F401 -- registers ORM metadata
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

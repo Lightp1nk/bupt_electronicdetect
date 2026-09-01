@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database.database import Base
-from app.models import collection, electricity  # noqa: F401
+from app.models import alert, collection, electricity  # noqa: F401
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.electricity_repository import ElectricityRepository
 from app.schemas.common import ApiResponse, ErrorCode
@@ -16,6 +16,7 @@ from app.schemas.electricity import CollectionSettingsUpdate, CollectionStatus, 
 from app.services.auth_session import SessionAccessError
 from app.services.collection_scheduler import JOB_ID, CollectionScheduleConfig, start_collection_scheduler
 from app.services.collection_service import CollectionService
+from app.services.monitoring_service import MonitoringService
 
 
 async def service_at(path: Path, manager: object) -> tuple[object, CollectionService, async_sessionmaker[AsyncSession]]:
@@ -23,7 +24,7 @@ async def service_at(path: Path, manager: object) -> tuple[object, CollectionSer
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
     sessions = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    return engine, CollectionService(sessions, manager, enabled=True, hour=4, minute=0), sessions  # type: ignore[arg-type]
+    return engine, CollectionService(sessions, manager, MonitoringService(asyncio.Lock()), enabled=True, hour=4, minute=0), sessions  # type: ignore[arg-type]
 
 
 class FakeClient:

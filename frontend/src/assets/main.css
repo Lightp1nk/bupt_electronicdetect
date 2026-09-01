@@ -32,4 +32,6 @@
 .chart { height:185px }
 .demo-badge { color:#206b30;background:var(--accent-soft);border-color:#cfe8d4 }
 .collection-settings { padding-top:2px }.collection-settings h2 { margin-bottom:8px }.collection-status { margin:14px 0 5px;font-size:13px;font-weight:650;color:var(--text-primary) }
+.alert-section{padding-top:18px;padding-bottom:18px}.alert-section .section-header{margin-bottom:10px}.alert-item{display:flex;justify-content:space-between;gap:16px;padding:10px 12px;border-radius:7px;font-size:13px;background:#fff7e8;color:#8a4b00}.alert-item.critical{background:#fff0ef;color:#b42318}.alert-item span{color:inherit;text-align:right}
+.thresholds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}.collection-settings>label{display:block;font-size:13px;color:var(--text-secondary);margin:10px 0}.collection-settings input[type=checkbox]{width:auto;height:auto;margin-right:7px}
 @media(max-width:650px){.header-actions{gap:10px}.demo-badge{display:none}.heatmap-scroll{justify-content:flex-start}.data-section{padding:18px}.heatmap-main,.month-labels{width:308px}.chart{height:190px}}

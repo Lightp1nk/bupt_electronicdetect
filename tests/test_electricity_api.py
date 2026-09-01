@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.api.dependencies import get_authenticated_bupt_client
 from app.database.database import Base, get_db_session
 from app.main import app
-from app.models import electricity  # noqa: F401
+from app.models import alert, collection, electricity  # noqa: F401
 from app.schemas.common import ApiResponse
 from app.schemas.electricity import ElectricityReading
 from app.services.auth_session import AuthSessionManager
+from app.services.monitoring_service import MonitoringService
 
 
 class FakeUpstreamClient:
@@ -45,6 +46,7 @@ def test_query_requires_login_and_history_reads_local_db(tmp_path: Path) -> None
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             app.state.auth_session_manager = AuthSessionManager()
+            app.state.monitoring_service = MonitoringService(asyncio.Lock())
             unauthorized = await client.post("/api/v1/electricity/query", json={
                 "area_id": "2", "building_id": "b", "floor_id": "f", "room_id": "r"
             })

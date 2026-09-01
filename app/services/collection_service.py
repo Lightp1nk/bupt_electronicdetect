@@ -15,24 +15,26 @@ from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.electricity import CollectionSettingsUpdate, CollectionStatus, CollectionStatusRead
 from app.services.auth_session import AuthSessionManager, SessionAccessError
 from app.services.electricity_service import ElectricityService, local_now, parse_source_time
+from app.services.monitoring_service import MonitoringService
 
 
 class CollectionService:
     """Serializes manual and scheduled collection runs for the single FastAPI process."""
 
     def __init__(
-        self, session_factory: Callable[[], AsyncSession], auth_manager: AuthSessionManager,
+        self, session_factory: Callable[[], AsyncSession], auth_manager: AuthSessionManager, monitoring_service: MonitoringService,
         *, enabled: bool, hour: int, minute: int, lock: asyncio.Lock | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._auth_manager = auth_manager
+        self._monitoring_service = monitoring_service
         self._enabled, self._hour, self._minute = enabled, hour, minute
         self._lock = lock or asyncio.Lock()
 
     async def get_status(self, *, already_running: bool = False) -> ApiResponse[CollectionStatusRead]:
         async with self._session_factory() as session:
             try:
-                settings = await CollectionRepository(session).get_or_create()
+                settings = await CollectionRepository(session).get_current_settings()
                 await session.commit()
                 return ApiResponse.ok(self._to_read(settings, already_running=already_running))
             except SQLAlchemyError:
@@ -42,7 +44,7 @@ class CollectionService:
     async def save_settings(self, payload: CollectionSettingsUpdate) -> ApiResponse[CollectionStatusRead]:
         async with self._session_factory() as session:
             try:
-                settings = await CollectionRepository(session).save_room(**payload.model_dump())
+                settings = await CollectionRepository(session).update_current_room(**payload.model_dump())
                 await session.commit()
                 return ApiResponse.ok(self._to_read(settings), "collection settings saved")
             except SQLAlchemyError:
@@ -52,7 +54,7 @@ class CollectionService:
     async def clear_settings(self) -> ApiResponse[CollectionStatusRead]:
         async with self._session_factory() as session:
             try:
-                settings = await CollectionRepository(session).clear_room()
+                settings = await CollectionRepository(session).clear_current_room()
                 await session.commit()
                 return ApiResponse.ok(self._to_read(settings), "collection room cleared")
             except SQLAlchemyError:
@@ -70,9 +72,9 @@ class CollectionService:
         async with self._session_factory() as session:
             repository = CollectionRepository(session)
             try:
-                settings = await repository.get_or_create()
+                settings = await repository.get_current_settings()
                 if not self._has_room(settings):
-                    await repository.update_status(status=CollectionStatus.NO_ROOM_CONFIGURED.value, message="no monitored room configured", attempted_at=attempted_at)
+                    await repository.update_current_status(status=CollectionStatus.NO_ROOM_CONFIGURED.value, message="no monitored room configured", attempted_at=attempted_at)
                     await session.commit()
                     return ApiResponse.ok(self._to_read(settings))
                 room = self._room_values(settings)
@@ -83,7 +85,7 @@ class CollectionService:
         try:
             async with self._auth_manager.acquire_client() as client:
                 async with self._session_factory() as session:
-                    result = await ElectricityService(session).query_and_save(client, **room)
+                    result = await self._monitoring_service.query_save_and_evaluate(session, client, **room)
         except SessionAccessError as exc:
             status = CollectionStatus.SESSION_EXPIRED if exc.code == ErrorCode.SESSION_EXPIRED else CollectionStatus.NOT_AUTHENTICATED
             return await self._record_terminal(status, exc.message, attempted_at)
@@ -106,7 +108,7 @@ class CollectionService:
     ) -> ApiResponse[CollectionStatusRead]:
         async with self._session_factory() as session:
             try:
-                settings = await CollectionRepository(session).update_status(
+                settings = await CollectionRepository(session).update_current_status(
                     status=status.value, message=message, attempted_at=attempted_at,
                     succeeded_at=succeeded_at, source_time=source_time,
                 )

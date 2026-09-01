@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import asyncio
 from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
@@ -16,15 +17,17 @@ from app.schemas.common import ApiResponse, ErrorCode
 from app.services.auth_session import AuthSessionManager
 from app.services.collection_scheduler import CollectionScheduleConfig, start_collection_scheduler
 from app.services.collection_service import CollectionService
+from app.services.monitoring_service import MonitoringService
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
     app.state.auth_session_manager = AuthSessionManager()
+    app.state.monitoring_service = MonitoringService(asyncio.Lock())
     schedule_config = CollectionScheduleConfig.from_environment()
     app.state.collection_service = CollectionService(
-        SessionLocal, app.state.auth_session_manager,
+        SessionLocal, app.state.auth_session_manager, app.state.monitoring_service,
         enabled=schedule_config.enabled, hour=schedule_config.hour, minute=schedule_config.minute,
     )
     app.state.collection_scheduler = start_collection_scheduler(app.state.collection_service, schedule_config)

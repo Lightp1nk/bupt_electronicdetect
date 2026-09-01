@@ -9,10 +9,12 @@ from app.database.database import get_db_session
 from app.providers.bupt_client import BUPTClient
 from app.schemas.common import ApiResponse
 from app.schemas.dormitory import Building, Floor, Room
-from app.schemas.electricity import CollectionSettingsUpdate, CollectionStatusRead, ElectricityAnalysis, ElectricityQueryRequest, ElectricityQuerySaveResult, ElectricityRecordRead
+from app.schemas.electricity import AlertEventRead, AlertEventStatus, AlertSettingsRead, AlertSettingsUpdate, CollectionSettingsUpdate, CollectionStatusRead, ElectricityAnalysis, ElectricityQueryRequest, ElectricityQuerySaveResult, ElectricityRecordRead
 from app.services.electricity_service import ElectricityService
 from app.services.statistics_service import StatisticsService
 from app.services.collection_service import CollectionService
+from app.services.alert_service import AlertService
+from app.services.monitoring_service import MonitoringService
 
 
 router = APIRouter(prefix="/api/v1/electricity", tags=["electricity"])
@@ -20,6 +22,7 @@ router = APIRouter(prefix="/api/v1/electricity", tags=["electricity"])
 
 def _collection_service(request: Request) -> CollectionService:
     return request.app.state.collection_service
+def _monitoring_service(request: Request) -> MonitoringService: return request.app.state.monitoring_service
 
 
 @router.get("/buildings", response_model=ApiResponse[list[Building]])
@@ -61,12 +64,12 @@ async def rooms(
 @router.post("/query", response_model=ApiResponse[ElectricityQuerySaveResult])
 async def query(
     payload: ElectricityQueryRequest,
+    request: Request,
     response: Response,
     client: BUPTClient = Depends(get_authenticated_bupt_client),
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[ElectricityQuerySaveResult]:
-    result = await ElectricityService(session).query_and_save(
-        client,
+    result = await _monitoring_service(request).query_save_and_evaluate(session, client,
         area_id=payload.area_id,
         building_id=payload.building_id,
         floor_id=payload.floor_id,
@@ -75,6 +78,19 @@ async def query(
     )
     response.status_code = _status_code(result.code)
     return result
+
+@router.get("/alerts", response_model=ApiResponse[list[AlertEventRead]])
+async def alerts(area_id: str, room_id: str, response: Response, session: AsyncSession = Depends(get_db_session), status: AlertEventStatus | None = None, limit: int = Query(default=20, ge=1, le=100)) -> ApiResponse[list[AlertEventRead]]:
+    result = await AlertService(session).list_events(area_id, room_id, status, limit); response.status_code = _status_code(result.code); return result
+@router.get("/alerts/active", response_model=ApiResponse[list[AlertEventRead]])
+async def active_alerts(area_id: str, room_id: str, response: Response, session: AsyncSession = Depends(get_db_session)) -> ApiResponse[list[AlertEventRead]]:
+    result = await AlertService(session).list_events(area_id, room_id, AlertEventStatus.ACTIVE, 100); response.status_code = _status_code(result.code); return result
+@router.get("/alerts/settings", response_model=ApiResponse[AlertSettingsRead])
+async def alert_settings(response: Response, session: AsyncSession = Depends(get_db_session)) -> ApiResponse[AlertSettingsRead]:
+    result = await AlertService(session).get_settings(); response.status_code = _status_code(result.code); return result
+@router.put("/alerts/settings", response_model=ApiResponse[AlertSettingsRead])
+async def save_alert_settings(payload: AlertSettingsUpdate, response: Response, session: AsyncSession = Depends(get_db_session)) -> ApiResponse[AlertSettingsRead]:
+    result = await AlertService(session).save_settings(payload); response.status_code = _status_code(result.code); return result
 
 
 @router.get("/history/{room_id}", response_model=ApiResponse[list[ElectricityRecordRead]])
