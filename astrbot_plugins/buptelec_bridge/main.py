@@ -1,0 +1,127 @@
+"""AstrBot-owned bridge for BUPT electricity notifications.
+
+The FastAPI application only knows a QQ number.  This plugin captures the
+platform-native UMO after an explicit private-chat binding and keeps that UMO
+inside AstrBot's own plugin data directory.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+from astrbot.api import logger
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
+from astrbot.api.message_components import Plain
+from astrbot.api.star import Context, Star, register
+from astrbot.api.web import json_response, request
+from astrbot.core.star.star_tools import StarTools
+
+
+PLUGIN_NAME = "buptelec_bridge"
+QQ_ID_PATTERN = re.compile(r"^\d{5,20}$")
+MAX_MESSAGE_LENGTH = 4_000
+
+
+@register(
+    PLUGIN_NAME,
+    "Pureastar",
+    "Bridge BUPT electricity notifications to explicitly bound QQ private chats.",
+    "0.1.0",
+)
+class BUPTElectricityBridge(Star):
+    """Owns QQ-to-UMO bindings and sends authenticated bridge messages."""
+
+    def __init__(self, context: Context) -> None:
+        super().__init__(context)
+        self.context = context
+        self._lock = asyncio.Lock()
+        self._bindings_path = Path(StarTools.get_data_dir(PLUGIN_NAME)) / "qq_umo_bindings.json"
+        self._bindings = self._load_bindings()
+        context.register_web_api(
+            f"/{PLUGIN_NAME}/api/send",
+            self.send_from_bridge,
+            ["POST"],
+            "Send a BUPT electricity notification to a bound QQ private chat.",
+        )
+
+    def _load_bindings(self) -> dict[str, str]:
+        try:
+            raw = json.loads(self._bindings_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {}
+        except (OSError, json.JSONDecodeError):
+            logger.warning("BUPT electricity bridge bindings could not be loaded.")
+            return {}
+
+        if not isinstance(raw, dict):
+            return {}
+        return {
+            qq_id: umo
+            for qq_id, umo in raw.items()
+            if isinstance(qq_id, str)
+            and QQ_ID_PATTERN.fullmatch(qq_id)
+            and isinstance(umo, str)
+            and umo
+        }
+
+    def _persist_bindings(self) -> None:
+        self._bindings_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self._bindings_path.with_suffix(".tmp")
+        temporary_path.write_text(
+            json.dumps(self._bindings, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        temporary_path.replace(self._bindings_path)
+
+    @filter.command("电费绑定")
+    async def bind_private_chat(self, event: AstrMessageEvent):
+        """Bind the sender's QQ number to the current private-chat UMO."""
+        qq_id = str(event.get_sender_id() or "").strip()
+        umo = str(getattr(event, "unified_msg_origin", "") or "").strip()
+
+        if not QQ_ID_PATTERN.fullmatch(qq_id) or "FriendMessage" not in umo:
+            yield event.plain_result("请在与机器人的 QQ 私聊中发送 /电费绑定。")
+            return
+
+        async with self._lock:
+            self._bindings[qq_id] = umo
+            try:
+                self._persist_bindings()
+            except OSError:
+                logger.warning("BUPT electricity bridge binding could not be saved.")
+                yield event.plain_result("绑定保存失败，请稍后重试。")
+                return
+
+        yield event.plain_result("北邮电费通知已绑定到当前私聊。")
+
+    async def send_from_bridge(self) -> Any:
+        """Accept a protected Bridge request from the FastAPI application."""
+        payload = await request.json(default=None)
+        if not isinstance(payload, dict):
+            return json_response({"success": False, "message": "invalid JSON body"}, status_code=400)
+
+        platform = payload.get("platform")
+        target_id = str(payload.get("target_id") or "").strip()
+        message = payload.get("message")
+        if platform != "qq" or not QQ_ID_PATTERN.fullmatch(target_id):
+            return json_response({"success": False, "message": "invalid notification target"}, status_code=400)
+        if not isinstance(message, str) or not message.strip() or len(message) > MAX_MESSAGE_LENGTH:
+            return json_response({"success": False, "message": "invalid notification message"}, status_code=400)
+
+        async with self._lock:
+            umo = self._bindings.get(target_id)
+        if not umo:
+            return json_response({"success": False, "message": "QQ target is not bound"}, status_code=404)
+
+        try:
+            delivered = await self.context.send_message(umo, MessageChain([Plain(message.strip())]))
+        except Exception:
+            logger.warning("BUPT electricity bridge delivery failed.")
+            return json_response({"success": False, "message": "delivery failed"}, status_code=502)
+        if not delivered:
+            return json_response({"success": False, "message": "no matching platform"}, status_code=502)
+        return json_response({"success": True})

@@ -1,0 +1,10 @@
+name: buptelec_bridge
+display_name: 北邮电费通知桥接
+desc: 将北邮电费系统的 QQ 通知目标转发为 AstrBot 私聊消息。
+author: Pureastar
+version: 0.1.0
+astrbot_version: ">=4.27.1"
+tags:
+  - notification
+  - bridge
+  - bupt
