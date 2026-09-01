@@ -38,7 +38,13 @@ Start the local API server:
 .\.venv\bin\python.exe -m uvicorn app.main:app --reload
 ```
 
-The app owns one `AuthSessionManager`, which owns at most one `BUPTClient`. A successful `POST /api/v1/auth/login` retains only that client's in-memory HTTP Cookie Jar. Passwords, Cookie values, and CAS data are never stored on disk or kept as manager attributes. Server shutdown and `POST /api/v1/auth/logout` close the client and discard the session.
+The app uses a browser HttpOnly application-session Cookie and one transitional, reusable Runtime `BUPTClient`. Before starting the API, configure a valid Fernet key; the server never generates a fallback key or stores upstream Cookies in plaintext:
+
+```powershell
+$env:APP_UPSTREAM_SESSION_KEY = .\.venv\bin\python.exe -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+After a successful BUPT CAS login, only the app-domain business Cookie payload is encrypted and stored per local user. Passwords, CAS Cookies, tickets, and raw application-session tokens are never persisted. Browser logout revokes only the current local application session; it does not delete the encrypted upstream authorization. Server shutdown closes the transient Runtime Client.
 
 Available routes:
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -27,7 +28,7 @@ class FakeUpstreamClient:
 
 class LoggedInManager:
     @asynccontextmanager
-    async def acquire_client(self):
+    async def acquire_client(self, user_id: int | None = None):
         yield FakeUpstreamClient()
 
 
@@ -51,7 +52,7 @@ def test_query_requires_login_and_history_reads_local_db(tmp_path: Path) -> None
                 "area_id": "2", "building_id": "b", "floor_id": "f", "room_id": "r"
             })
             app.state.auth_session_manager = LoggedInManager()
-            app.dependency_overrides[get_current_user] = lambda: object()
+            app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id=1)
             queried = await client.post("/api/v1/electricity/query", json={
                 "area_id": "2", "building_id": "b", "floor_id": "f", "room_id": "r", "room_name": "203"
             })

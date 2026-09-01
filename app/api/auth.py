@@ -9,6 +9,10 @@ from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import LoginRequest, SessionState, SessionStatus, UserRead
 from app.schemas.common import ApiResponse, ErrorCode
 from app.services.app_session_service import SESSION_COOKIE_NAME, generate_token, hash_token, utc_now
+from app.services.upstream_session_service import (
+    UpstreamSessionConfigurationError,
+    UpstreamSessionService,
+)
 
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -34,16 +38,24 @@ async def login(
     repository = AuthRepository(session)
     try:
         user = await repository.get_or_create_authenticated_user(bootstrap.data.username, now)
+        upstream_service: UpstreamSessionService = request.app.state.upstream_session_service
+        await upstream_service.save_authenticated_session(
+            session, user_id=user.id, app_session=bootstrap.data.session, now=now,
+        )
         await repository.create_app_session(
             user_id=user.id, token_hash=hash_token(raw_token), now=now, expires_at=expires_at,
         )
         await session.commit()
+    except UpstreamSessionConfigurationError:
+        await session.rollback()
+        response.status_code = 500
+        return ApiResponse.error(ErrorCode.INTERNAL_ERROR, "upstream session encryption is not configured")
     except SQLAlchemyError:
         await session.rollback()
         response.status_code = 500
         return ApiResponse.error(ErrorCode.DATABASE_ERROR, "application session could not be created")
 
-    activated = await manager.activate_runtime(bootstrap.data.session)
+    activated = await manager.activate_runtime(user.id, bootstrap.data.session)
     if not activated.success:
         try:
             await repository.revoke_by_token_hash(hash_token(raw_token), now=utc_now())
@@ -62,7 +74,7 @@ async def login(
         httponly=True,
         samesite="lax",
     )
-    return ApiResponse.ok(_authenticated_status(user), "Authentication successful")
+    return ApiResponse.ok(_authenticated_status(user, upstream_status="ACTIVE"), "Authentication successful")
 
 
 @router.get("/status", response_model=ApiResponse[SessionStatus])
@@ -80,7 +92,8 @@ async def status(
         if user is None:
             return ApiResponse.ok(_unauthenticated_status())
         await session.commit()
-        return ApiResponse.ok(_authenticated_status(user))
+        upstream_service: UpstreamSessionService = request.app.state.upstream_session_service
+        return ApiResponse.ok(_authenticated_status(user, upstream_status=await upstream_service.get_status(session, user.id)))
     except SQLAlchemyError:
         await session.rollback()
         response.status_code = 500
@@ -111,8 +124,13 @@ async def logout(
     return ApiResponse.ok(_unauthenticated_status(), "Logged out")
 
 
-def _authenticated_status(user: object) -> SessionStatus:
-    return SessionStatus(authenticated=True, state=SessionState.AUTHENTICATED, user=UserRead.model_validate(user))
+def _authenticated_status(user: object, *, upstream_status: str | None = None) -> SessionStatus:
+    return SessionStatus(
+        authenticated=True,
+        state=SessionState.AUTHENTICATED,
+        user=UserRead.model_validate(user),
+        upstream_status=upstream_status,
+    )
 
 
 def _unauthenticated_status() -> SessionStatus:
@@ -122,7 +140,7 @@ def _unauthenticated_status() -> SessionStatus:
 def _status_code(code: ErrorCode) -> int:
     if code == ErrorCode.OK:
         return 200
-    if code in {ErrorCode.AUTH_FAILED, ErrorCode.AUTH_REQUIRED, ErrorCode.SESSION_EXPIRED}:
+    if code in {ErrorCode.AUTH_FAILED, ErrorCode.AUTH_REQUIRED, ErrorCode.SESSION_EXPIRED, ErrorCode.REAUTH_REQUIRED}:
         return 401
     if code == ErrorCode.INVALID_ARGUMENT:
         return 400

@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database.database import Base, get_db_session
 from app.main import app
 from app.models.user import AppSession, User
+from app.models.upstream_session import UpstreamSession
 from app.providers.bupt_auth import AuthErrorKind, AuthFailure
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.common import ApiResponse
 from app.services.app_session_service import AppSessionConfig, SESSION_COOKIE_NAME, hash_token, utc_now
 from app.services.auth_bootstrap import AppBusinessCookie, AppBusinessSession, BootstrapResult
 from app.services.auth_session import AuthSessionManager
+from app.services.upstream_session_service import UpstreamSessionService
 
 
 class FakeRuntimeClient:
@@ -68,7 +70,11 @@ def test_app_sessions_identify_browsers_without_creating_runtime_mapping(tmp_pat
 
         app.dependency_overrides[get_db_session] = override_session
         app.state.app_session_config = AppSessionConfig(ttl=timedelta(days=14), secure_cookie=False, last_seen_interval=timedelta())
-        app.state.auth_session_manager = AuthSessionManager(FakeBootstrapService(), runtime_factory)  # type: ignore[arg-type]
+        app.state.upstream_session_service = UpstreamSessionService(sessions)
+        app.state.auth_session_manager = AuthSessionManager(
+            FakeBootstrapService(), runtime_factory,
+            runtime_session_loader=app.state.upstream_session_service.load_business_session,
+        )  # type: ignore[arg-type]
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as browser_a, httpx.AsyncClient(
             transport=transport, base_url="http://test"
@@ -113,6 +119,7 @@ def test_app_sessions_identify_browsers_without_creating_runtime_mapping(tmp_pat
         async with sessions() as session:
             users = list((await session.scalars(select(User).order_by(User.bupt_username))).all())
             app_sessions = list((await session.scalars(select(AppSession))).all())
+            upstream_sessions = list((await session.scalars(select(UpstreamSession).order_by(UpstreamSession.user_id))).all())
         assert [user.bupt_username for user in users] == ["user-a", "user-b"]
         assert len(app_sessions) == 3
         assert len({record.token_hash for record in app_sessions}) == 3
@@ -121,6 +128,10 @@ def test_app_sessions_identify_browsers_without_creating_runtime_mapping(tmp_pat
         assert token_b not in {record.token_hash for record in app_sessions}
         assert sum(record.revoked_at is not None for record in app_sessions if record.user_id == users[0].id) == 1
         assert all(record.revoked_at is None for record in app_sessions if record.user_id == users[1].id)
+        assert len(upstream_sessions) == 2
+        assert all(record.status == "ACTIVE" for record in upstream_sessions)
+        assert all("test-session" not in record.encrypted_cookie_blob for record in upstream_sessions)
+        assert all("test-key" not in record.encrypted_cookie_blob for record in upstream_sessions)
 
         app.dependency_overrides.clear()
         await engine.dispose()
@@ -141,7 +152,11 @@ def test_expired_revoked_and_failed_authentication_do_not_authenticate_or_create
 
         app.dependency_overrides[get_db_session] = override_session
         app.state.app_session_config = AppSessionConfig(last_seen_interval=timedelta())
-        app.state.auth_session_manager = AuthSessionManager(FakeBootstrapService(), lambda _: FakeRuntimeClient())  # type: ignore[arg-type]
+        app.state.upstream_session_service = UpstreamSessionService(sessions)
+        app.state.auth_session_manager = AuthSessionManager(
+            FakeBootstrapService(), lambda _: FakeRuntimeClient(),
+            runtime_session_loader=app.state.upstream_session_service.load_business_session,
+        )  # type: ignore[arg-type]
         now = utc_now()
         expired_raw, revoked_raw = "expired-test-token", "revoked-test-token"
         async with sessions() as session:
@@ -164,6 +179,7 @@ def test_expired_revoked_and_failed_authentication_do_not_authenticate_or_create
         assert failed.status_code == 401
         async with sessions() as session:
             assert await session.scalar(select(User).where(User.bupt_username == "failed")) is None
+            assert await session.scalar(select(UpstreamSession).join(User).where(User.bupt_username == "failed")) is None
         app.dependency_overrides.clear()
         await engine.dispose()
 

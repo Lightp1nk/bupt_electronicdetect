@@ -1,5 +1,5 @@
 export type ErrorCode =
-  | 'OK' | 'INVALID_ARGUMENT' | 'AUTH_REQUIRED' | 'AUTH_FAILED' | 'SESSION_EXPIRED'
+  | 'OK' | 'INVALID_ARGUMENT' | 'AUTH_REQUIRED' | 'AUTH_FAILED' | 'SESSION_EXPIRED' | 'REAUTH_REQUIRED'
   | 'NETWORK_ERROR' | 'TIMEOUT' | 'UPSTREAM_ERROR' | 'PARSE_ERROR' | 'NOT_FOUND'
   | 'BUSINESS_ERROR' | 'DATABASE_ERROR' | 'INTERNAL_ERROR'
 
@@ -11,7 +11,8 @@ export interface ApiResponse<T> {
 }
 
 export interface CurrentUser { id: number; bupt_username: string; display_name: string | null }
-export interface SessionStatus { authenticated: boolean; state: 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SESSION_EXPIRED'; user: CurrentUser | null }
+export type UpstreamSessionStatus = 'UNKNOWN' | 'ACTIVE' | 'EXPIRED' | 'REAUTH_REQUIRED'
+export interface SessionStatus { authenticated: boolean; state: 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SESSION_EXPIRED'; user: CurrentUser | null; upstream_status: UpstreamSessionStatus | null }
 export interface Building { id: string; name: string; area_id: string }
 export interface Floor { id: string; name: string; building_id: string; area_id: string }
 export interface Room { id: string; name: string; floor_id: string; building_id: string; area_id: string }

@@ -88,6 +88,31 @@ class AppBusinessSession:
                 )
             )
 
+    def to_payload(self) -> list[dict[str, object]]:
+        """Explicit, minimal persistence shape; callers must encrypt it before storage."""
+        return [
+            {"name": cookie.name, "value": cookie.value, "domain": cookie.domain, "path": cookie.path,
+             "expires": cookie.expires, "secure": cookie.secure}
+            for cookie in self.cookies
+        ]
+
+    @classmethod
+    def from_payload(cls, payload: object) -> "AppBusinessSession":
+        if not isinstance(payload, list):
+            raise ValueError("app business session payload must be a list")
+        cookies: list[AppBusinessCookie] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                raise ValueError("app business session payload contains an invalid cookie")
+            expires = item.get("expires")
+            if expires is not None and (not isinstance(expires, int) or isinstance(expires, bool)):
+                raise ValueError("app business session cookie expiry is invalid")
+            values = (item.get("name"), item.get("value"), item.get("domain"), item.get("path"), item.get("secure"))
+            if not all(isinstance(value, str) for value in values[:4]) or not isinstance(values[4], bool):
+                raise ValueError("app business session cookie is invalid")
+            cookies.append(AppBusinessCookie(values[0], values[1], values[2], values[3], expires, values[4]))
+        return cls(tuple(cookies))
+
 
 @dataclass(frozen=True)
 class BootstrapResult:

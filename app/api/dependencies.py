@@ -33,12 +33,12 @@ async def get_current_user(
 
 
 async def get_authenticated_bupt_client(
-    request: Request, _: User = Depends(get_current_user),
+    request: Request, current_user: User = Depends(get_current_user),
 ) -> AsyncIterator[BUPTClient]:
-    """Current user identifies the browser; the sole upstream Runtime client remains a Phase-B2 limitation."""
+    """Current user selects an encrypted upstream session; B2.1 still has one reusable Runtime cache."""
     manager = request.app.state.auth_session_manager
     try:
-        async with manager.acquire_client() as client:
+        async with manager.acquire_client(current_user.id) as client:
             yield client
     except SessionAccessError as exc:
         raise ApiError(exc.code, exc.message) from exc

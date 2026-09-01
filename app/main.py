@@ -15,6 +15,7 @@ from app.api.errors import ApiError
 from app.database.database import SessionLocal, dispose_db, init_db
 from app.schemas.common import ApiResponse, ErrorCode
 from app.services.auth_session import AuthSessionManager
+from app.services.upstream_session_service import UpstreamSessionService
 from app.services.app_session_service import AppSessionConfig
 from app.services.collection_scheduler import CollectionScheduleConfig, start_collection_scheduler
 from app.services.collection_service import CollectionService
@@ -25,7 +26,13 @@ from app.services.monitoring_service import MonitoringService
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
     app.state.app_session_config = AppSessionConfig.from_environment()
-    app.state.auth_session_manager = AuthSessionManager()
+    app.state.upstream_session_service = UpstreamSessionService(SessionLocal)
+    app.state.auth_session_manager = AuthSessionManager(
+        runtime_session_loader=app.state.upstream_session_service.load_business_session,
+        runtime_cookie_persister=app.state.upstream_session_service.persist_runtime_cookies,
+        runtime_marker=app.state.upstream_session_service.mark_validated,
+        runtime_expiry_marker=app.state.upstream_session_service.mark_expired,
+    )
     app.state.monitoring_service = MonitoringService(asyncio.Lock())
     schedule_config = CollectionScheduleConfig.from_environment()
     app.state.collection_service = CollectionService(
@@ -48,6 +55,6 @@ app.include_router(electricity_router)
 
 @app.exception_handler(ApiError)
 async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
-    status_code = 401 if exc.code in {ErrorCode.AUTH_REQUIRED, ErrorCode.SESSION_EXPIRED} else 502
+    status_code = 401 if exc.code in {ErrorCode.AUTH_REQUIRED, ErrorCode.SESSION_EXPIRED, ErrorCode.REAUTH_REQUIRED} else 502
     body = ApiResponse[None].error(exc.code, exc.message).model_dump(mode="json")
     return JSONResponse(status_code=status_code, content=body)

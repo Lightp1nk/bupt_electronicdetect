@@ -16,6 +16,13 @@ class SessionState(str, Enum):
     SESSION_EXPIRED = "SESSION_EXPIRED"
 
 
+class UpstreamSessionState(str, Enum):
+    UNKNOWN = "UNKNOWN"
+    ACTIVE = "ACTIVE"
+    EXPIRED = "EXPIRED"
+    REAUTH_REQUIRED = "REAUTH_REQUIRED"
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,3 +35,4 @@ class SessionStatus(BaseModel):
     authenticated: bool
     state: SessionState
     user: UserRead | None = None
+    upstream_status: UpstreamSessionState | None = None
