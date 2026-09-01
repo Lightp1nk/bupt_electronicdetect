@@ -20,7 +20,7 @@ from app.services.app_session_service import AppSessionConfig
 from app.services.collection_scheduler import CollectionScheduleConfig, MultiUserCollectionScheduler, start_collection_scheduler
 from app.services.collection_service import CollectionService
 from app.services.monitoring_service import MonitoringService
-from app.services.notification_providers import AstrBotNotifier
+from app.services.notification_providers import AstrBotBridgeNotifier
 
 
 @asynccontextmanager
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime_marker=app.state.upstream_session_service.mark_validated,
         runtime_expiry_marker=app.state.upstream_session_service.mark_reauth_required,
     )
-    app.state.monitoring_service = MonitoringService(notification_provider=AstrBotNotifier.from_environment())
+    app.state.monitoring_service = MonitoringService(notification_provider=AstrBotBridgeNotifier.from_environment())
     schedule_config = CollectionScheduleConfig.from_environment()
     app.state.collection_service = CollectionService(
         SessionLocal, app.state.auth_session_manager, app.state.monitoring_service,

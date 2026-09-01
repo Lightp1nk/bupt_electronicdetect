@@ -71,6 +71,17 @@ $env:COLLECTION_MAX_CONCURRENCY = "3"
 
 The older `ELECTRICITY_COLLECTION_*` variables remain accepted for compatibility. A missed run is eligible for only a five-minute grace period, so starting the server much later in the morning does not run an obsolete collection job.
 
+## AstrBot Bridge notifications
+
+The application sends notification bindings' QQ IDs to a trusted internal Bridge; it does not construct or persist AstrBot UMO values and does not call AstrBot's official IM API. Configure the Bridge only through server environment variables:
+
+```powershell
+$env:ASTRBOT_BRIDGE_ENDPOINT = "http://bridge.internal:8080"
+$env:ASTRBOT_BRIDGE_TOKEN = "..." # optional, if required by the Bridge
+```
+
+The application calls `POST {ASTRBOT_BRIDGE_ENDPOINT}/api/send` with `platform`, `target_id`, and plain-text `message`. If configured, the token is sent as a Bearer Authorization header. Keep the Bridge endpoint and token out of source control and browser storage.
+
 Available routes:
 
 - `POST /api/v1/auth/login` with `{"username": "...", "password": "..."}`
