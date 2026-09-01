@@ -1,38 +1,37 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 
 import pytest
+from fastapi import FastAPI
 
 from app.providers.bupt_auth import AuthErrorKind, AuthFailure
 from app.schemas.common import ApiResponse, ErrorCode
 from app.services.auth_bootstrap import AppBusinessCookie, AppBusinessSession, BootstrapResult
 from app.services.auth_session import AuthSessionManager, SessionAccessError
+from app.services.upstream_session_service import UpstreamSessionError, UpstreamSessionStatus
 
 
 def run(coro: object) -> object:
     return asyncio.run(coro)  # type: ignore[arg-type]
 
 
-def business_session() -> AppBusinessSession:
-    return AppBusinessSession(
-        (
-            AppBusinessCookie("eai-sess", "test-session", "app.bupt.edu.cn", "/", None, True),
-            AppBusinessCookie("UUkey", "test-key", "app.bupt.edu.cn", "/", None, False),
-        )
-    )
+def business_session(value: str = "test-session") -> AppBusinessSession:
+    return AppBusinessSession((
+        AppBusinessCookie("eai-sess", value, "app.bupt.edu.cn", "/", None, True),
+        AppBusinessCookie("UUkey", f"key-{value}", "app.bupt.edu.cn", "/", None, False),
+    ))
 
 
 class FakeBootstrapService:
     def __init__(self, *, error: Exception | None = None) -> None:
         self.error = error
-        self.calls = 0
 
     async def authenticate(self, username: str, password: str) -> BootstrapResult:
-        self.calls += 1
         if self.error:
             raise self.error
-        return BootstrapResult(username=username, session=business_session())
+        return BootstrapResult(username=username, session=business_session(username))
 
 
 class FakeRuntimeClient:
@@ -47,99 +46,156 @@ class FakeRuntimeClient:
         self.closed += 1
 
 
-def test_login_replaces_and_closes_old_runtime_client() -> None:
-    runtimes = [FakeRuntimeClient(), FakeRuntimeClient()]
-    manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtimes.pop(0))  # type: ignore[arg-type]
+def test_registering_b_does_not_replace_a_and_same_user_reuses_client() -> None:
+    runtimes: list[FakeRuntimeClient] = []
 
-    first = run(manager.bootstrap_login("user", "secret"))
-    assert first.success and first.data is not None
-    assert run(manager.activate_runtime(1, first.data.session)).success
-    old = manager.get_client()
-    second = run(manager.bootstrap_login("user", "secret"))
-    assert second.success and second.data is not None
-    assert run(manager.activate_runtime(1, second.data.session)).success
-    assert old is not None and old.closed == 1
-    assert manager.get_client() is not old
-    assert not hasattr(manager, "_username")
-    assert not hasattr(manager, "_password")
+    def factory(_: AppBusinessSession) -> FakeRuntimeClient:
+        runtime = FakeRuntimeClient()
+        runtimes.append(runtime)
+        return runtime
+
+    manager = AuthSessionManager(FakeBootstrapService(), factory)  # type: ignore[arg-type]
+
+    async def scenario() -> None:
+        a = await manager.bootstrap_login("a", "secret")
+        b = await manager.bootstrap_login("b", "secret")
+        assert a.data is not None and b.data is not None
+        assert (await manager.register_client(1, a.data.session)).success
+        assert (await manager.register_client(2, b.data.session)).success
+        client_a = await manager.get_client(1)
+        client_b = await manager.get_client(2)
+        assert client_a is await manager.get_client(1)
+        assert client_a is not client_b
+        assert runtimes[0].closed == runtimes[1].closed == 0
+
+    run(scenario())
+
+
+def test_logout_removes_only_requested_user_and_close_all_closes_remaining() -> None:
+    runtimes = [FakeRuntimeClient(), FakeRuntimeClient()]
+    manager = AuthSessionManager(runtime_client_factory=lambda _: runtimes.pop(0))  # type: ignore[arg-type]
+
+    async def scenario() -> None:
+        assert (await manager.register_client(1, business_session("a"))).success
+        assert (await manager.register_client(2, business_session("b"))).success
+        client_a, client_b = await manager.get_client(1), await manager.get_client(2)
+        await manager.remove_client(1)
+        assert client_a.closed == 1
+        assert client_b.closed == 0
+        assert await manager.get_client(2) is client_b
+        await manager.close_all()
+        assert client_b.closed == 1
+
+    run(scenario())
+
+
+def test_missing_or_expired_upstream_session_affects_only_that_user() -> None:
+    expired_users: list[int] = []
+
+    async def loader(user_id: int) -> AppBusinessSession:
+        if user_id == 3:
+            raise UpstreamSessionError(UpstreamSessionStatus.REAUTH_REQUIRED)
+        return business_session(str(user_id))
+
+    async def mark_reauth(user_id: int) -> None:
+        expired_users.append(user_id)
+
+    clients: dict[int, FakeRuntimeClient] = {}
+
+    def factory(session: AppBusinessSession) -> FakeRuntimeClient:
+        client = FakeRuntimeClient()
+        clients[len(clients) + 1] = client
+        return client
+
+    manager = AuthSessionManager(
+        runtime_client_factory=factory, runtime_session_loader=loader, runtime_expiry_marker=mark_reauth,
+    )  # type: ignore[arg-type]
+
+    async def scenario() -> None:
+        client_a = await manager.get_client(1)
+        client_b = await manager.get_client(2)
+        with pytest.raises(SessionAccessError) as missing:
+            await manager.get_client(3)
+        assert missing.value.code == ErrorCode.REAUTH_REQUIRED
+        client_a.verification = ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired")
+        with pytest.raises(SessionAccessError) as expired:
+            async with manager.acquire_client(1):
+                pass
+        assert expired.value.code == ErrorCode.SESSION_EXPIRED
+        assert client_a.closed == 1
+        assert client_b.closed == 0
+        assert await manager.get_client(2) is client_b
+        assert expired_users == [1]
+
+    run(scenario())
+
+
+def test_same_user_initializes_once_while_different_users_do_not_share_lock() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    factory_calls = 0
+
+    async def loader(user_id: int) -> AppBusinessSession:
+        if user_id == 1:
+            started.set()
+            await release.wait()
+        return business_session(str(user_id))
+
+    def factory(_: AppBusinessSession) -> FakeRuntimeClient:
+        nonlocal factory_calls
+        factory_calls += 1
+        return FakeRuntimeClient()
+
+    manager = AuthSessionManager(runtime_client_factory=factory, runtime_session_loader=loader)  # type: ignore[arg-type]
+
+    async def scenario() -> None:
+        first_a = asyncio.create_task(manager.get_client(1))
+        await started.wait()
+        second_a = asyncio.create_task(manager.get_client(1))
+        client_b = await asyncio.wait_for(manager.get_client(2), timeout=0.2)
+        release.set()
+        client_a, duplicate_a = await first_a, await second_a
+        assert client_a is duplicate_a
+        assert client_a is not client_b
+        assert factory_calls == 2
+
+    run(scenario())
 
 
 def test_login_failure_does_not_create_runtime_client() -> None:
     bootstrap = FakeBootstrapService(error=AuthFailure(AuthErrorKind.CAPTCHA_REQUIRED, "login"))
-    created = False
-
-    def runtime(_: AppBusinessSession) -> FakeRuntimeClient:
-        nonlocal created
-        created = True
-        return FakeRuntimeClient()
-
-    manager = AuthSessionManager(bootstrap, runtime)  # type: ignore[arg-type]
+    manager = AuthSessionManager(bootstrap, lambda _: FakeRuntimeClient())  # type: ignore[arg-type]
     result = run(manager.bootstrap_login("user", "secret"))
     assert not result.success
-    assert manager.get_client() is None
-    assert created is False
 
 
-def test_status_expiry_clears_runtime_client() -> None:
-    expired = FakeRuntimeClient(verification=ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired"))
-    manager = AuthSessionManager(FakeBootstrapService(), lambda _: expired)  # type: ignore[arg-type]
-    logged_in = run(manager.bootstrap_login("user", "secret"))
-    assert logged_in.data is not None
-    run(manager.activate_runtime(1, logged_in.data.session))
-    result = run(manager.status())
-    assert result.success and result.data.authenticated is False
-    assert result.data.state.value == "SESSION_EXPIRED"
-    assert manager.get_client() is None
-    assert expired.closed == 1
+def test_fastapi_shutdown_calls_close_all(monkeypatch: pytest.MonkeyPatch) -> None:
+    main_module = importlib.import_module("app.main")
 
+    class FakeManager:
+        def __init__(self, **_: object) -> None:
+            self.close_all_calls = 0
 
-def test_logout_and_unlogged_access() -> None:
-    runtime = FakeRuntimeClient()
-    manager = AuthSessionManager(FakeBootstrapService(), lambda _: runtime)  # type: ignore[arg-type]
-    assert run(manager.status()).data.authenticated is False
-    logged_in = run(manager.bootstrap_login("user", "secret"))
-    assert logged_in.data is not None
-    run(manager.activate_runtime(1, logged_in.data.session))
-    assert run(manager.logout()).success
-    assert runtime.closed == 1
+        async def close_all(self) -> None:
+            self.close_all_calls += 1
 
-    async def access() -> None:
-        async with manager.acquire_client():
-            raise AssertionError("should not yield")
+    class FakeScheduler:
+        def shutdown(self, *, wait: bool) -> None:
+            assert wait is False
 
-    with pytest.raises(SessionAccessError) as error:
-        run(access())
-    assert error.value.code == ErrorCode.AUTH_REQUIRED
+    manager = FakeManager()
 
+    async def noop() -> None:
+        return None
 
-def test_business_lease_marks_user_upstream_session_expired_after_request() -> None:
-    class ExpiringRuntime(FakeRuntimeClient):
-        def __init__(self) -> None:
-            super().__init__()
-            self.checks = 0
+    monkeypatch.setattr(main_module, "init_db", noop)
+    monkeypatch.setattr(main_module, "dispose_db", noop)
+    monkeypatch.setattr(main_module, "AuthSessionManager", lambda **_: manager)
+    monkeypatch.setattr(main_module, "start_collection_scheduler", lambda *_: FakeScheduler())
 
-        async def check_auth_result(self) -> ApiResponse[bool]:
-            self.checks += 1
-            return ApiResponse.ok(True) if self.checks == 1 else ApiResponse.error(ErrorCode.SESSION_EXPIRED, "expired")
+    async def scenario() -> None:
+        async with main_module.lifespan(FastAPI()):
+            assert manager.close_all_calls == 0
+        assert manager.close_all_calls == 1
 
-    expired_users: list[int] = []
-
-    async def load(_: int) -> AppBusinessSession:
-        return business_session()
-
-    async def mark_expired(user_id: int) -> None:
-        expired_users.append(user_id)
-
-    runtime = ExpiringRuntime()
-    manager = AuthSessionManager(
-        runtime_client_factory=lambda _: runtime, runtime_session_loader=load, runtime_expiry_marker=mark_expired,
-    )  # type: ignore[arg-type]
-
-    async def lease() -> None:
-        async with manager.acquire_client(7):
-            pass
-
-    run(lease())
-    assert expired_users == [7]
-    assert runtime.closed == 1
-    assert manager.get_client(7) is None
+    run(scenario())

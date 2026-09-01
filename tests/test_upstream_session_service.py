@@ -135,20 +135,20 @@ def test_runtime_cookie_rotation_is_reencrypted_and_manager_reuses_by_user(tmp_p
             runtime_session_loader=service.load_business_session,
             runtime_cookie_persister=service.persist_runtime_cookies,
             runtime_marker=service.mark_validated,
-            runtime_expiry_marker=service.mark_expired,
+            runtime_expiry_marker=service.mark_reauth_required,
         )
-        client_a = await manager.get_or_create_runtime_client(user_a)
-        assert client_a is await manager.get_or_create_runtime_client(user_a)
+        client_a = await manager.get_client(user_a)
+        assert client_a is await manager.get_client(user_a)
         for cookie in client_a.client.cookies.jar:
             if cookie.name == "eai-sess":
                 cookie.value = "session-a-rotated"
         assert await service.persist_runtime_cookies(user_a, client_a) is True
         assert (await service.load_business_session(user_a)).cookies[0].value == "session-a-rotated"
-        client_b = await manager.get_or_create_runtime_client(user_b)
+        client_b = await manager.get_client(user_b)
         assert client_b is not client_a
-        assert client_a.client.is_closed
+        assert not client_a.client.is_closed
         assert len(clients) == 2
-        await manager.logout()
+        await manager.close_all()
         await engine.dispose()
 
     run(scenario())

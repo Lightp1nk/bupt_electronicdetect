@@ -150,6 +150,17 @@ class UpstreamSessionService:
             except SQLAlchemyError:
                 await session.rollback()
 
+    async def mark_reauth_required(self, user_id: int) -> None:
+        """Mark only the affected user's upstream session as no longer reusable."""
+        async with self._session_factory() as session:
+            try:
+                await UpstreamSessionRepository(session).mark_status(
+                    user_id, status=UpstreamSessionStatus.REAUTH_REQUIRED, now=utc_now(),
+                )
+                await session.commit()
+            except SQLAlchemyError:
+                await session.rollback()
+
     async def mark_validated(self, user_id: int) -> None:
         async with self._session_factory() as session:
             try:

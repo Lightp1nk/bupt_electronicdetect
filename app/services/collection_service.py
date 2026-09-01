@@ -122,7 +122,8 @@ class CollectionService:
         return CollectionStatusRead(
             enabled=self._enabled and settings.enabled,
             scheduled_time=f"{self._hour:02d}:{self._minute:02d}",
-            authenticated=self._auth_manager.get_client() is not None,
+            # TODO(Phase D): collection settings and scheduler need an explicit user scope.
+            authenticated=getattr(self._auth_manager, "has_scheduler_client", lambda: self._auth_manager.get_client() is not None)(),
             area_id=settings.area_id, building_id=settings.building_id, building_name=settings.building_name,
             floor_id=settings.floor_id, floor_name=settings.floor_name, room_id=settings.room_id, room_name=settings.room_name,
             status=CollectionStatus.ALREADY_RUNNING if already_running else CollectionStatus(settings.status),

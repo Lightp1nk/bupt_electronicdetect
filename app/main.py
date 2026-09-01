@@ -1,4 +1,4 @@
-"""FastAPI application with an in-memory, single-user BUPT session."""
+"""FastAPI application with user-scoped in-memory BUPT runtime sessions."""
 
 from __future__ import annotations
 
@@ -31,9 +31,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime_session_loader=app.state.upstream_session_service.load_business_session,
         runtime_cookie_persister=app.state.upstream_session_service.persist_runtime_cookies,
         runtime_marker=app.state.upstream_session_service.mark_validated,
-        runtime_expiry_marker=app.state.upstream_session_service.mark_expired,
+        runtime_expiry_marker=app.state.upstream_session_service.mark_reauth_required,
     )
-    app.state.monitoring_service = MonitoringService(asyncio.Lock())
+    app.state.monitoring_service = MonitoringService()
     schedule_config = CollectionScheduleConfig.from_environment()
     app.state.collection_service = CollectionService(
         SessionLocal, app.state.auth_session_manager, app.state.monitoring_service,
@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         app.state.collection_scheduler.shutdown(wait=False)
-        await app.state.auth_session_manager.logout()
+        await app.state.auth_session_manager.close_all()
         await dispose_db()
 
 

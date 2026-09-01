@@ -50,7 +50,7 @@ class FakeBootstrapService:
         )
 
 
-def test_app_sessions_identify_browsers_without_creating_runtime_mapping(tmp_path: Path) -> None:
+def test_app_sessions_identify_browsers_and_keep_runtime_clients_isolated(tmp_path: Path) -> None:
     async def scenario() -> None:
         engine = create_async_engine(f"sqlite+aiosqlite:///{(tmp_path / 'auth.db').as_posix()}")
         async with engine.begin() as connection:
@@ -111,10 +111,11 @@ def test_app_sessions_identify_browsers_without_creating_runtime_mapping(tmp_pat
         assert raw_a is None  # Logout clears the browser's raw token.
         assert raw_b is not None
 
-        # The browser sessions are separate, while the runtime remains one global Phase-A client.
-        assert app.state.auth_session_manager.get_client() is runtimes[-1]
-        assert runtimes[-1].closed == 0
-        assert all(runtime.closed == 1 for runtime in runtimes[:-1])
+        # B2.2 keeps both user runtimes. Logging out A closes only A's client.
+        assert len(runtimes) == 3
+        assert runtimes[0].closed == 1  # A's renewed login replaces only A's first runtime.
+        assert runtimes[1].closed == 1  # A logout closes only A's second runtime.
+        assert runtimes[2].closed == 0  # B remains available.
 
         async with sessions() as session:
             users = list((await session.scalars(select(User).order_by(User.bupt_username))).all())

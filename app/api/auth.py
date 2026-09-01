@@ -55,7 +55,7 @@ async def login(
         response.status_code = 500
         return ApiResponse.error(ErrorCode.DATABASE_ERROR, "application session could not be created")
 
-    activated = await manager.activate_runtime(user.id, bootstrap.data.session)
+    activated = await manager.register_client(user.id, bootstrap.data.session)
     if not activated.success:
         try:
             await repository.revoke_by_token_hash(hash_token(raw_token), now=utc_now())
@@ -105,14 +105,21 @@ async def logout(
     request: Request, response: Response, session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[SessionStatus]:
     raw_token = request.cookies.get(SESSION_COOKIE_NAME)
+    user = None
     if raw_token:
         try:
-            await AuthRepository(session).revoke_by_token_hash(hash_token(raw_token), now=utc_now())
+            repository = AuthRepository(session)
+            user = await repository.get_active_user_by_token_hash(
+                hash_token(raw_token), now=utc_now(), last_seen_interval=request.app.state.app_session_config.last_seen_interval,
+            )
+            await repository.revoke_by_token_hash(hash_token(raw_token), now=utc_now())
             await session.commit()
         except SQLAlchemyError:
             await session.rollback()
             response.status_code = 500
             return ApiResponse.error(ErrorCode.DATABASE_ERROR, "application session could not be revoked")
+    if user is not None:
+        await request.app.state.auth_session_manager.remove_client(user.id)
     config = request.app.state.app_session_config
     response.delete_cookie(
         key=SESSION_COOKIE_NAME,

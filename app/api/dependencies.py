@@ -1,4 +1,4 @@
-"""Dependencies that lease the one authenticated upstream client."""
+"""Dependencies that resolve a user's isolated upstream runtime client."""
 
 from collections.abc import AsyncIterator
 
@@ -35,7 +35,7 @@ async def get_current_user(
 async def get_authenticated_bupt_client(
     request: Request, current_user: User = Depends(get_current_user),
 ) -> AsyncIterator[BUPTClient]:
-    """Current user selects an encrypted upstream session; B2.1 still has one reusable Runtime cache."""
+    """Current user selects and exclusively leases their reusable Runtime Client."""
     manager = request.app.state.auth_session_manager
     try:
         async with manager.acquire_client(current_user.id) as client:
