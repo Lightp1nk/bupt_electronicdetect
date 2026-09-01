@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
 from app.api.electricity import router as electricity_router
+from app.api.notification import router as notification_router
 from app.api.errors import ApiError
 from app.database.database import SessionLocal, dispose_db, init_db
 from app.schemas.common import ApiResponse, ErrorCode
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="BUPT Dormitory Electricity Monitor", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(electricity_router)
+app.include_router(notification_router)
 
 
 @app.exception_handler(ApiError)
