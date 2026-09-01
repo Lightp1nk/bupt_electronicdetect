@@ -1,6 +1,6 @@
-# BUPT Dormitory Electricity Client
+# 《宿舍用电监测与智能提醒系统》
 
-This project implements the verified BUPT CAS flow and the authenticated dormitory-electricity API flow using one `httpx.AsyncClient` for the complete lifecycle.
+当前仓库已实现并验证北邮 CAS 认证、宿舍电费数据采集客户端和进程内 Session 管理。完整的软件工程文档见 [docs/README.md](docs/README.md)。历史记录、统计预测和前端提醒仍处于规划阶段。
 
 ## Setup
 
@@ -9,7 +9,7 @@ python -m venv .venv
 .\.venv\bin\python.exe -m pip install -r requirements.txt
 ```
 
-On this MSYS Python installation, Pydantic v2 and pytest are provided by the corresponding MSYS packages because upstream binary wheels are not published for its platform.
+On this MSYS Python installation, upstream Pydantic v2 wheels are not published for its platform. Install the corresponding MSYS packages first (Pydantic, pytest, FastAPI and Uvicorn), then create the virtual environment with system packages enabled, or use a standard CPython environment where `pip install -r requirements.txt` succeeds.
 
 ## Probes
 
@@ -46,9 +46,18 @@ Available routes:
 - `GET /api/v1/auth/status`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/electricity/buildings?area_id=1` (minimal protected route)
+- `POST /api/v1/electricity/query` (protected live query and snapshot save)
+- `GET /api/v1/electricity/history/{room_id}?area_id=2` (local SQLite history)
+- `GET /api/v1/electricity/latest/{room_id}?area_id=2` (local SQLite latest record)
 
 To verify one login supports repeated protected requests, run the server and then:
 
 ```powershell
 .\.venv\bin\python.exe scripts\session_probe.py
+```
+
+To query one selected room and persist a history snapshot:
+
+```powershell
+.\.venv\bin\python.exe scripts\database_probe.py
 ```

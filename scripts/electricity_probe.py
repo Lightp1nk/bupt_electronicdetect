@@ -12,21 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.providers.bupt_auth import AuthFailure
 from app.providers.bupt_client import BUPTClient
 from app.schemas.common import ApiResponse
-
-
-CAMPUSES = {"1": "西土城", "2": "沙河"}
+from interactive_selection import CAMPUSES, select_dormitory
 
 
 def prompt_credentials() -> tuple[str, str]:
     return input("BUPT username: "), getpass.getpass("BUPT password: ")
-
-
-def choose(prompt: str, items: list[object]) -> object:
-    while True:
-        raw = input(prompt).strip()
-        if raw.isdigit() and 1 <= int(raw) <= len(items):
-            return items[int(raw) - 1]
-        print("Please enter a listed number.")
 
 
 def show_error(result: ApiResponse[object]) -> None:
@@ -64,35 +54,14 @@ async def main() -> int:
     try:
         async with BUPTClient(credential_provider=prompt_credentials, trace=print) as client:
             await client.login()
-            print("\nChoose campus:\n[1] 西土城\n[2] 沙河")
-            area_id = input("Campus: ").strip()
-            if area_id not in CAMPUSES:
-                print("Invalid campus.", file=sys.stderr)
+            selected = await select_dormitory(client)
+            if not selected.success or selected.data is None:
+                show_error(selected)
                 return 1
-
-            buildings = await client.get_buildings(area_id=area_id)
-            if not buildings.success or not buildings.data:
-                show_error(buildings)
-                return 1
-            for index, building in enumerate(buildings.data, 1):
-                print(f"[{index}] {building.name}")
-            building = choose("Building: ", buildings.data)
-
-            floors = await client.get_floors(area_id=area_id, building_id=building.id)
-            if not floors.success or not floors.data:
-                show_error(floors)
-                return 1
-            for index, floor in enumerate(floors.data, 1):
-                print(f"[{index}] {floor.name}")
-            floor = choose("Floor: ", floors.data)
-
-            rooms = await client.get_rooms(area_id=area_id, building_id=building.id, floor_id=floor.id)
-            if not rooms.success or not rooms.data:
-                show_error(rooms)
-                return 1
-            for index, room in enumerate(rooms.data, 1):
-                print(f"[{index}] {room.name}")
-            room = choose("Room: ", rooms.data)
+            area_id = selected.data.area_id
+            building = selected.data.building
+            floor = selected.data.floor
+            room = selected.data.room
 
             reading = await client.query_electricity(
                 area_id=area_id,

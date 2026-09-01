@@ -4,3 +4,6 @@ pydantic>=2.0,<3
 pytest>=8,<10
 fastapi>=0.100,<1
 uvicorn>=0.20,<1
+sqlalchemy>=2.0,<3
+aiosqlite>=0.20,<1
+APScheduler>=3.10,<4

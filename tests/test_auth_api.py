@@ -9,6 +9,7 @@ import app.services.auth_session as session_module
 from app.main import app
 from app.schemas.common import ApiResponse
 from app.services.auth_session import AuthSessionManager
+from app.services.collection_scheduler import JOB_ID
 
 
 class FakeClient:
@@ -25,6 +26,12 @@ class FakeClient:
         return ApiResponse.ok(True)
 
     async def get_buildings(self, *, area_id: str) -> ApiResponse[list[object]]:
+        return ApiResponse.ok([])
+
+    async def get_floors(self, *, area_id: str, building_id: str) -> ApiResponse[list[object]]:
+        return ApiResponse.ok([])
+
+    async def get_rooms(self, *, area_id: str, building_id: str, floor_id: str) -> ApiResponse[list[object]]:
         return ApiResponse.ok([])
 
     async def close(self) -> None:
@@ -44,6 +51,8 @@ def test_auth_routes_reuse_then_clear_session(monkeypatch: pytest.MonkeyPatch) -
             active = await client.get("/api/v1/auth/status")
             first = await client.get("/api/v1/electricity/buildings", params={"area_id": "1"})
             second = await client.get("/api/v1/electricity/buildings", params={"area_id": "1"})
+            floors = await client.get("/api/v1/electricity/floors", params={"area_id": "1", "building_id": "b"})
+            rooms = await client.get("/api/v1/electricity/rooms", params={"area_id": "1", "building_id": "b", "floor_id": "f"})
             logout = await client.post("/api/v1/auth/logout")
             protected = await client.get("/api/v1/electricity/buildings", params={"area_id": "1"})
         assert before.json()["data"]["authenticated"] is False
@@ -51,6 +60,8 @@ def test_auth_routes_reuse_then_clear_session(monkeypatch: pytest.MonkeyPatch) -
         assert active.json()["data"]["authenticated"] is True
         assert first.json()["success"] is True
         assert second.json()["success"] is True
+        assert floors.json()["success"] is True
+        assert rooms.json()["success"] is True
         assert logout.json()["success"] is True
         assert protected.status_code == 401
         assert protected.json()["code"] == "AUTH_REQUIRED"
@@ -65,6 +76,9 @@ def test_lifespan_shutdown_closes_client(monkeypatch: pytest.MonkeyPatch) -> Non
 
     async def scenario() -> None:
         async with app.router.lifespan_context(app):
+            scheduler = app.state.collection_scheduler
+            assert scheduler.get_job(JOB_ID) is not None
+            assert len([job for job in scheduler.get_jobs() if job.id == JOB_ID]) == 1
             result = await app.state.auth_session_manager.login("user", "secret")
             assert result.success
 

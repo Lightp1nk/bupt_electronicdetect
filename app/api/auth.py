@@ -35,6 +35,8 @@ def _status_code(code: ErrorCode) -> int:
         return 401
     if code == ErrorCode.INVALID_ARGUMENT:
         return 400
+    if code == ErrorCode.NOT_FOUND:
+        return 404
     if code in {ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT, ErrorCode.UPSTREAM_ERROR}:
         return 502
     return 500
