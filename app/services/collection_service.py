@@ -82,7 +82,7 @@ class CollectionService:
         try:
             async with self._auth_manager.acquire_client(user_id) as client:
                 async with self._session_factory() as session:
-                    result = await self._monitoring_service.query_save_and_evaluate(session, client, **room)
+                    result = await self._monitoring_service.query_save_and_evaluate(user_id, session, client, **room)
         except SessionAccessError as exc:
             status = CollectionStatus.SESSION_EXPIRED if exc.code == ErrorCode.SESSION_EXPIRED else CollectionStatus.NOT_AUTHENTICATED
             return await self._record_terminal(user_id, status, exc.message, attempted_at)
