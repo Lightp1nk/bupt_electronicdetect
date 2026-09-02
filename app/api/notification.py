@@ -8,8 +8,17 @@ from app.repositories.notification_delivery_repository import NotificationDelive
 from app.schemas.common import ApiResponse
 from app.schemas.notification import NotificationBindingRead, NotificationBindingUpdate, NotificationDeliveryStatus, NotificationPlatform, NotificationProvider, NotificationStage, NotificationStatusRead
 from app.services.app_session_service import utc_now
+from app.services.bridge_auth import require_astrbot_bridge
 
 router=APIRouter(prefix="/api/v1/notification",tags=["notification"])
+@router.get("/bridge/bindings/{target_id}", response_model=ApiResponse[dict[str, bool]], dependencies=[Depends(require_astrbot_bridge)])
+async def bridge_binding_eligibility(target_id: str, session: AsyncSession = Depends(get_db_session)):
+    """Expose only whether the Bridge may bind this explicitly enabled QQ target."""
+    eligible = target_id.isdigit() and 5 <= len(target_id) <= 20 and await NotificationBindingRepository(session).has_enabled_target(
+        NotificationProvider.ASTRBOT.value, NotificationPlatform.QQ.value, target_id,
+    )
+    return ApiResponse.ok({"eligible": eligible})
+
 @router.get("/bindings",response_model=ApiResponse[list[NotificationBindingRead]])
 async def bindings(session:AsyncSession=Depends(get_db_session),user:User=Depends(get_current_user)):
     return ApiResponse.ok([NotificationBindingRead.model_validate(x) for x in await NotificationBindingRepository(session).list(user.id)])

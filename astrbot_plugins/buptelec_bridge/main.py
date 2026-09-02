@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
@@ -24,6 +27,8 @@ from astrbot.core.star.star_tools import StarTools
 PLUGIN_NAME = "buptelec_bridge"
 QQ_ID_PATTERN = re.compile(r"^\d{5,20}$")
 MAX_MESSAGE_LENGTH = 4_000
+APP_ENDPOINT_ENV = "BUPTELEC_APP_ENDPOINT"
+BRIDGE_TOKEN_ENV = "BUPTELEC_BRIDGE_TOKEN"
 
 
 @register(
@@ -41,6 +46,8 @@ class BUPTElectricityBridge(Star):
         self._lock = asyncio.Lock()
         self._bindings_path = Path(StarTools.get_data_dir(PLUGIN_NAME)) / "qq_umo_bindings.json"
         self._bindings = self._load_bindings()
+        self._app_endpoint = os.getenv(APP_ENDPOINT_ENV, "").rstrip("/")
+        self._bridge_token = os.getenv(BRIDGE_TOKEN_ENV, "")
         context.register_web_api(
             f"/{PLUGIN_NAME}/api/send",
             self.send_from_bridge,
@@ -77,6 +84,24 @@ class BUPTElectricityBridge(Star):
         )
         temporary_path.replace(self._bindings_path)
 
+    async def _is_enabled_notification_target(self, qq_id: str) -> bool | None:
+        """Check that the QQ target was saved and enabled before binding it."""
+        if not self._app_endpoint or not self._bridge_token:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"{self._app_endpoint}/api/v1/notification/bridge/bindings/{qq_id}",
+                    headers={"Authorization": f"Bearer {self._bridge_token}"},
+                )
+            if response.status_code != 200:
+                return None
+            payload = response.json()
+            return bool(isinstance(payload, dict) and isinstance(payload.get("data"), dict) and payload["data"].get("eligible"))
+        except (httpx.HTTPError, ValueError):
+            logger.warning("BUPT electricity bridge binding validation failed.")
+            return None
+
     @filter.command("电费绑定")
     async def bind_private_chat(self, event: AstrMessageEvent):
         """Bind the sender's QQ number to the current private-chat UMO."""
@@ -85,6 +110,14 @@ class BUPTElectricityBridge(Star):
 
         if not QQ_ID_PATTERN.fullmatch(qq_id) or "FriendMessage" not in umo:
             yield event.plain_result("请在与机器人的 QQ 私聊中发送 /电费绑定。")
+            return
+
+        enabled = await self._is_enabled_notification_target(qq_id)
+        if enabled is None:
+            yield event.plain_result("通知绑定校验服务暂不可用，请稍后重试。")
+            return
+        if not enabled:
+            yield event.plain_result("请先在北邮电费查询系统中保存并启用当前 QQ 号，再发送 /电费绑定。")
             return
 
         async with self._lock:
