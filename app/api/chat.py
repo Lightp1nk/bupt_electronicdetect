@@ -7,11 +7,12 @@ from app.api.auth import _status_code
 from app.api.dependencies import get_current_user
 from app.database.database import get_db_session
 from app.models.user import User
-from app.schemas.chat import ChatBindingCodeRead, ChatIdentityRead, ChatPlatform, InternalChatBindRequest
+from app.schemas.chat import ChatBindingCodeRead, ChatElectricitySummaryRead, ChatIdentityRead, ChatPlatform, InternalChatBindRequest, InternalChatSummaryRequest
 from app.schemas.common import ApiResponse
 from app.schemas.common import ErrorCode
 from app.services.chat_identity_service import ChatIdentityService
 from app.services.internal_auth import require_astrbot_internal
+from app.services.chat_electricity_summary_service import ChatElectricitySummaryService
 
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
@@ -19,7 +20,11 @@ internal_router = APIRouter(prefix="/api/internal/chat", tags=["chat-internal"])
 
 
 def _chat_status_code(code: ErrorCode) -> int:
-    return 409 if code == ErrorCode.BUSINESS_ERROR else _status_code(code)
+    if code == ErrorCode.BUSINESS_ERROR:
+        return 409
+    if code in {ErrorCode.CHAT_NOT_BOUND, ErrorCode.NO_ROOM_CONFIGURED, ErrorCode.NO_DATA}:
+        return 404
+    return _status_code(code)
 
 
 @router.get("/identity", response_model=ApiResponse[ChatIdentityRead | None])
@@ -44,5 +49,12 @@ async def delete_identity(platform: ChatPlatform, response: Response, session: A
 @internal_router.post("/bind", response_model=ApiResponse[ChatIdentityRead], dependencies=[Depends(require_astrbot_internal)])
 async def confirm_binding(payload: InternalChatBindRequest, response: Response, session: AsyncSession = Depends(get_db_session)) -> ApiResponse[ChatIdentityRead]:
     result = await ChatIdentityService(session).confirm_binding(payload.platform, payload.external_id, payload.code)
+    response.status_code = _chat_status_code(result.code)
+    return result
+
+
+@internal_router.post("/electricity/summary", response_model=ApiResponse[ChatElectricitySummaryRead], dependencies=[Depends(require_astrbot_internal)])
+async def electricity_summary(payload: InternalChatSummaryRequest, response: Response, session: AsyncSession = Depends(get_db_session)) -> ApiResponse[ChatElectricitySummaryRead]:
+    result = await ChatElectricitySummaryService(session).get_summary(payload.platform, payload.external_id)
     response.status_code = _chat_status_code(result.code)
     return result

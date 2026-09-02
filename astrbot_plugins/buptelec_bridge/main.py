@@ -16,6 +16,11 @@ from typing import Any
 
 import httpx
 
+try:
+    from .query_client import BUPTElectricityInternalClient, ChatCommandService
+except ImportError:  # AstrBot loads plugin main modules directly in some versions.
+    from query_client import BUPTElectricityInternalClient, ChatCommandService
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.message_components import Plain
@@ -29,13 +34,14 @@ QQ_ID_PATTERN = re.compile(r"^\d{5,20}$")
 MAX_MESSAGE_LENGTH = 4_000
 APP_ENDPOINT_ENV = "BUPTELEC_APP_ENDPOINT"
 BRIDGE_TOKEN_ENV = "BUPTELEC_BRIDGE_TOKEN"
+INTERNAL_TOKEN_ENV = "BUPTELEC_INTERNAL_TOKEN"
 
 
 @register(
     PLUGIN_NAME,
     "Pureastar",
-    "Bridge BUPT electricity notifications to explicitly bound QQ private chats.",
-    "0.1.0",
+    "Bridge BUPT electricity notifications and private QQ electricity summaries.",
+    "0.2.0",
 )
 class BUPTElectricityBridge(Star):
     """Owns QQ-to-UMO bindings and sends authenticated bridge messages."""
@@ -48,6 +54,8 @@ class BUPTElectricityBridge(Star):
         self._bindings = self._load_bindings()
         self._app_endpoint = os.getenv(APP_ENDPOINT_ENV, "").rstrip("/")
         self._bridge_token = os.getenv(BRIDGE_TOKEN_ENV, "")
+        self._internal_client = BUPTElectricityInternalClient(self._app_endpoint, os.getenv(INTERNAL_TOKEN_ENV, ""))
+        self._chat_commands = ChatCommandService(self._internal_client)
         context.register_web_api(
             f"/{PLUGIN_NAME}/api/send",
             self.send_from_bridge,
@@ -101,6 +109,30 @@ class BUPTElectricityBridge(Star):
         except (httpx.HTTPError, ValueError):
             logger.warning("BUPT electricity bridge binding validation failed.")
             return None
+
+    @staticmethod
+    def _private_qq_id(event: AstrMessageEvent) -> str | None:
+        qq_id = str(event.get_sender_id() or "").strip()
+        umo = str(getattr(event, "unified_msg_origin", "") or "")
+        return qq_id if QQ_ID_PATTERN.fullmatch(qq_id) and "FriendMessage" in umo else None
+
+    @staticmethod
+    def _command_argument(event: AstrMessageEvent, command: str) -> str:
+        message = str(getattr(event, "message_str", "") or "").strip().lstrip("/")
+        if not message.startswith(command):
+            return ""
+        return message[len(command):].strip().split(maxsplit=1)[0] if message[len(command):].strip() else ""
+
+    @filter.command("绑定")
+    async def bind_chat_identity(self, event: AstrMessageEvent):
+        """Confirm a short-lived Web-generated QQ identity binding code."""
+        code = self._command_argument(event, "绑定")
+        yield event.plain_result(await self._chat_commands.bind_reply(self._private_qq_id(event), code))
+
+    @filter.command("电费", alias=["查询电费"])
+    async def electricity_summary(self, event: AstrMessageEvent):
+        """Return the sender's saved electricity snapshot without upstream refresh."""
+        yield event.plain_result(await self._chat_commands.summary_reply(self._private_qq_id(event)))
 
     @filter.command("电费绑定")
     async def bind_private_chat(self, event: AstrMessageEvent):
