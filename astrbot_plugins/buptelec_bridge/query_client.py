@@ -98,7 +98,7 @@ class ChatCommandService:
             return "请先在网页生成绑定码，再发送 /绑定 绑定码。"
         result = await self._client.bind(qq_id, code)
         if result.success:
-            return "QQ 身份绑定成功。现在可以发送 /电费 查询已采集的数据。"
+            return "QQ 绑定成功，AstrBot 通知已自动启用。现在可以发送 /电费 查询已采集的数据。"
         if result.code == "AUTH_FAILED":
             return "绑定码无效或已过期，请回网页重新生成。"
         if result.code == "BUSINESS_ERROR":

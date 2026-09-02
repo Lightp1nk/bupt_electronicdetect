@@ -14,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.api.dependencies import get_current_user
 from app.database.database import Base, get_db_session
 from app.main import app
-from app.models import chat_identity, user  # noqa: F401 -- register metadata
+from app.models import chat_identity, notification_binding, user  # noqa: F401 -- register metadata
 from app.models.chat_identity import ChatIdentity, PendingChatBinding
+from app.models.notification_binding import NotificationBinding
 from app.models.user import User
 from app.services.app_session_service import utc_now
 
@@ -55,6 +56,10 @@ def test_chat_identity_binding_flow_is_scoped_and_does_not_store_plain_code(tmp_
                 assert (await client.post("/api/internal/chat/bind", headers={"Authorization": "Bearer wrong"}, json={"platform": "qq", "external_id": "123456", "code": code})).status_code == 401
                 success = await client.post("/api/internal/chat/bind", headers={"Authorization": "Bearer internal-test-token"}, json={"platform": "qq", "external_id": "123456", "code": code})
                 assert success.status_code == 200 and success.json()["data"]["external_id"] == "123456"
+                async with sessions() as session:
+                    binding = await session.scalar(select(NotificationBinding).where(NotificationBinding.user_id == 1))
+                    assert binding is not None
+                    assert (binding.provider, binding.platform, binding.target_id, binding.enabled) == ("astrbot", "qq", "123456", True)
                 assert (await client.post("/api/internal/chat/bind", headers={"Authorization": "Bearer internal-test-token"}, json={"platform": "qq", "external_id": "123456", "code": code})).status_code == 401
                 assert (await client.post("/api/internal/chat/bind", headers={"Authorization": "Bearer internal-test-token"}, json={"platform": "qq", "external_id": "123456", "code": "WRONG-CODE", "user_id": 99})).status_code == 422
 
@@ -69,6 +74,9 @@ def test_chat_identity_binding_flow_is_scoped_and_does_not_store_plain_code(tmp_
                 rebound = await client.post("/api/internal/chat/bind", headers={"Authorization": "Bearer internal-test-token"}, json={"platform": "qq", "external_id": "654321", "code": new_code})
                 assert rebound.status_code == 200
                 assert (await client.get("/api/v1/chat/identity?platform=qq")).json()["data"]["external_id"] == "654321"
+                async with sessions() as session:
+                    binding = await session.scalar(select(NotificationBinding).where(NotificationBinding.user_id == 1))
+                    assert binding is not None and binding.target_id == "654321" and binding.enabled
 
                 current["id"] = 2
                 assert (await client.delete("/api/v1/chat/identity/qq")).status_code == 404
@@ -78,8 +86,10 @@ def test_chat_identity_binding_flow_is_scoped_and_does_not_store_plain_code(tmp_
             async with sessions() as session:
                 pending = (await session.scalars(select(PendingChatBinding))).all()
                 identities = (await session.scalars(select(ChatIdentity))).all()
+                bindings = (await session.scalars(select(NotificationBinding))).all()
                 assert all(code.replace("-", "") not in row.code_hash for row in pending)
                 assert not identities
+                assert not bindings
                 assert all(not hasattr(row, "umo") for row in pending)
         finally:
             app.dependency_overrides.clear()

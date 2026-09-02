@@ -1,14 +1,13 @@
 import asyncio
-import os
 from datetime import datetime
-import pytest
 import httpx
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession,async_sessionmaker,create_async_engine
 from app.database.database import Base
-from app.models import alert,collection,electricity,notification_binding,upstream_session,user
+from app.api.dependencies import get_current_user
+from app.models import alert,chat_identity,collection,electricity,notification_binding,upstream_session,user
+from app.models.chat_identity import ChatIdentity
+from app.models.user import User
 from app.repositories.notification_binding_repository import NotificationBindingRepository
-from app.schemas.notification import NotificationBindingUpdate
 from app.database.database import get_db_session
 from app.main import app
 
@@ -24,40 +23,33 @@ def test_notification_bindings_are_user_scoped_and_upserted(tmp_path):
   await e.dispose()
  asyncio.run(run())
 
-def test_notification_binding_validates_qq_and_provider_platform():
- assert NotificationBindingUpdate(provider='astrbot',platform='qq',target_id='12345',enabled=True).target_id=='12345'
- for value in ({'provider':'unknown','platform':'qq','target_id':'12345','enabled':True},{'provider':'astrbot','platform':'unknown','target_id':'12345','enabled':True},{'provider':'astrbot','platform':'qq','target_id':'abc','enabled':True}):
-  with pytest.raises(ValidationError): NotificationBindingUpdate(**value)
-
-
-def test_bridge_can_only_bind_an_explicitly_enabled_qq_target(tmp_path):
+def test_notification_target_is_derived_from_chat_identity_and_only_enabled_is_mutable(tmp_path):
  async def run():
   e=create_async_engine(f"sqlite+aiosqlite:///{(tmp_path/'bridge.db').as_posix()}")
   async with e.begin() as c: await c.run_sync(Base.metadata.create_all)
   S=async_sessionmaker(e,expire_on_commit=False,class_=AsyncSession)
   async def override_session():
    async with S() as session: yield session
-  previous = os.environ.get('ASTRBOT_BRIDGE_TOKEN')
-  os.environ['ASTRBOT_BRIDGE_TOKEN'] = 'test-bridge-token'
   app.dependency_overrides[get_db_session] = override_session
+  app.dependency_overrides[get_current_user] = lambda: type('UserContext', (), {'id': 1})()
   try:
+   now=datetime.now()
+   async with S() as session:
+    session.add(User(id=1,bupt_username='a',display_name=None,created_at=now,last_login_at=now)); await session.commit()
    transport=httpx.ASGITransport(app=app)
    async with httpx.AsyncClient(transport=transport,base_url='http://test') as client:
-    assert (await client.get('/api/v1/notification/bridge/bindings/123456')).status_code == 401
-    headers={'Authorization':'Bearer test-bridge-token'}
-    missing=await client.get('/api/v1/notification/bridge/bindings/123456',headers=headers)
-    assert missing.status_code == 200 and missing.json()['data']['eligible'] is False
+    # The legacy endpoint no longer accepts a hand-entered target_id.
+    assert (await client.put('/api/v1/notification/bindings',json={'provider':'astrbot','platform':'qq','target_id':'123456','enabled':True})).status_code == 405
+    assert (await client.put('/api/v1/notification/bindings/astrbot/qq/enabled',json={'enabled':True})).status_code == 404
     async with S() as session:
-     await NotificationBindingRepository(session).upsert(1,'astrbot','qq','123456',True,datetime.now()); await session.commit()
-    enabled=await client.get('/api/v1/notification/bridge/bindings/123456',headers=headers)
-    assert enabled.json()['data']['eligible'] is True
+     session.add(ChatIdentity(user_id=1,platform='qq',external_id='123456',verified_at=now,created_at=now,updated_at=now)); await session.commit()
+    enabled=await client.put('/api/v1/notification/bindings/astrbot/qq/enabled',json={'enabled':True})
+    assert enabled.status_code == 200 and enabled.json()['data']['target_id'] == '123456' and enabled.json()['data']['enabled'] is True
+    disabled=await client.put('/api/v1/notification/bindings/astrbot/qq/enabled',json={'enabled':False})
+    assert disabled.status_code == 200 and disabled.json()['data']['target_id'] == '123456' and disabled.json()['data']['enabled'] is False
     async with S() as session:
-     await NotificationBindingRepository(session).upsert(1,'astrbot','qq','123456',False,datetime.now()); await session.commit()
-    disabled=await client.get('/api/v1/notification/bridge/bindings/123456',headers=headers)
-    assert disabled.json()['data']['eligible'] is False
+     bindings=await NotificationBindingRepository(session).list(1); assert len(bindings)==1 and bindings[0].target_id=='123456'
   finally:
    app.dependency_overrides.clear()
-   if previous is None: os.environ.pop('ASTRBOT_BRIDGE_TOKEN',None)
-   else: os.environ['ASTRBOT_BRIDGE_TOKEN'] = previous
    await e.dispose()
  asyncio.run(run())

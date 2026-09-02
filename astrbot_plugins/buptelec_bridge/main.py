@@ -14,8 +14,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 try:
     from .query_client import BUPTElectricityInternalClient, ChatCommandService
 except ImportError:  # AstrBot loads plugin main modules directly in some versions.
@@ -33,7 +31,6 @@ PLUGIN_NAME = "buptelec_bridge"
 QQ_ID_PATTERN = re.compile(r"^\d{5,20}$")
 MAX_MESSAGE_LENGTH = 4_000
 APP_ENDPOINT_ENV = "BUPTELEC_APP_ENDPOINT"
-BRIDGE_TOKEN_ENV = "BUPTELEC_BRIDGE_TOKEN"
 INTERNAL_TOKEN_ENV = "BUPTELEC_INTERNAL_TOKEN"
 
 
@@ -53,7 +50,6 @@ class BUPTElectricityBridge(Star):
         self._bindings_path = Path(StarTools.get_data_dir(PLUGIN_NAME)) / "qq_umo_bindings.json"
         self._bindings = self._load_bindings()
         self._app_endpoint = os.getenv(APP_ENDPOINT_ENV, "").rstrip("/")
-        self._bridge_token = os.getenv(BRIDGE_TOKEN_ENV, "")
         self._internal_client = BUPTElectricityInternalClient(self._app_endpoint, os.getenv(INTERNAL_TOKEN_ENV, ""))
         self._chat_commands = ChatCommandService(self._internal_client)
         context.register_web_api(
@@ -92,24 +88,6 @@ class BUPTElectricityBridge(Star):
         )
         temporary_path.replace(self._bindings_path)
 
-    async def _is_enabled_notification_target(self, qq_id: str) -> bool | None:
-        """Check that the QQ target was saved and enabled before binding it."""
-        if not self._app_endpoint or not self._bridge_token:
-            return None
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(
-                    f"{self._app_endpoint}/api/v1/notification/bridge/bindings/{qq_id}",
-                    headers={"Authorization": f"Bearer {self._bridge_token}"},
-                )
-            if response.status_code != 200:
-                return None
-            payload = response.json()
-            return bool(isinstance(payload, dict) and isinstance(payload.get("data"), dict) and payload["data"].get("eligible"))
-        except (httpx.HTTPError, ValueError):
-            logger.warning("BUPT electricity bridge binding validation failed.")
-            return None
-
     @staticmethod
     def _private_qq_id(event: AstrMessageEvent) -> str | None:
         qq_id = str(event.get_sender_id() or "").strip()
@@ -125,33 +103,13 @@ class BUPTElectricityBridge(Star):
 
     @filter.command("绑定")
     async def bind_chat_identity(self, event: AstrMessageEvent):
-        """Confirm a short-lived Web-generated QQ identity binding code."""
-        code = self._command_argument(event, "绑定")
-        yield event.plain_result(await self._chat_commands.bind_reply(self._private_qq_id(event), code))
+        """Bind identity, notification target, and private-chat UMO together."""
+        qq_id = self._private_qq_id(event)
+        if qq_id is None:
+            yield event.plain_result("请在与机器人的 QQ 私聊中发送 /绑定 绑定码。")
+            return
 
-    @filter.command("电费", alias=["查询电费"])
-    async def electricity_summary(self, event: AstrMessageEvent):
-        """Return the sender's saved electricity snapshot without upstream refresh."""
-        yield event.plain_result(await self._chat_commands.summary_reply(self._private_qq_id(event)))
-
-    @filter.command("电费绑定")
-    async def bind_private_chat(self, event: AstrMessageEvent):
-        """Bind the sender's QQ number to the current private-chat UMO."""
-        qq_id = str(event.get_sender_id() or "").strip()
         umo = str(getattr(event, "unified_msg_origin", "") or "").strip()
-
-        if not QQ_ID_PATTERN.fullmatch(qq_id) or "FriendMessage" not in umo:
-            yield event.plain_result("请在与机器人的 QQ 私聊中发送 /电费绑定。")
-            return
-
-        enabled = await self._is_enabled_notification_target(qq_id)
-        if enabled is None:
-            yield event.plain_result("通知绑定校验服务暂不可用，请稍后重试。")
-            return
-        if not enabled:
-            yield event.plain_result("请先在北邮电费查询系统中保存并启用当前 QQ 号，再发送 /电费绑定。")
-            return
-
         async with self._lock:
             self._bindings[qq_id] = umo
             try:
@@ -161,7 +119,13 @@ class BUPTElectricityBridge(Star):
                 yield event.plain_result("绑定保存失败，请稍后重试。")
                 return
 
-        yield event.plain_result("北邮电费通知已绑定到当前私聊。")
+        code = self._command_argument(event, "绑定")
+        yield event.plain_result(await self._chat_commands.bind_reply(qq_id, code))
+
+    @filter.command("电费", alias=["查询电费"])
+    async def electricity_summary(self, event: AstrMessageEvent):
+        """Return the sender's saved electricity snapshot without upstream refresh."""
+        yield event.plain_result(await self._chat_commands.summary_reply(self._private_qq_id(event)))
 
     async def send_from_bridge(self) -> Any:
         """Accept a protected Bridge request from the FastAPI application."""

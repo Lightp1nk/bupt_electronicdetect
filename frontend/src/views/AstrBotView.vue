@@ -27,6 +27,6 @@ onMounted(loadStatus)
       <p v-else-if="status?.last_delivery_status === 'failed'" class="integration-status warning"><CircleAlert :size="16" />最近一次投递失败，请检查 QQ 绑定</p>
       <p v-else class="muted">暂无投递记录</p>
     </div>
-    <div class="integration-card integration-steps"><h2>绑定步骤</h2><ol><li>在“设置”中填写 QQ 号并保存、启用通知。</li><li>使用同一 QQ 号私聊机器人，发送 <code>/电费绑定</code>。</li><li>机器人确认后，后续预警会发送到该私聊。</li></ol><p class="muted">未先保存并启用 QQ 号时，机器人不会完成绑定。</p><button class="primary-button integration-action" @click="emit('configure')">前往通知设置</button></div>
+    <div class="integration-card integration-steps"><h2>绑定步骤</h2><ol><li>前往“设置”生成一次性 QQ 绑定码。</li><li>使用同一 QQ 号私聊机器人，发送 <code>/绑定 绑定码</code>。</li><li>机器人确认后，QQ 查询与预警通知会同时完成绑定。</li></ol><p class="muted">QQ 号由机器人自动确认，网页中无需填写。</p><button class="primary-button integration-action" @click="emit('configure')">前往设置</button></div>
   </section>
 </template>

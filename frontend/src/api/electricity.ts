@@ -18,4 +18,4 @@ export const getAlertSettings = () => request<AlertSettings>('/electricity/alert
 export const saveAlertSettings = (payload: AlertSettings) => request<AlertSettings>('/electricity/alerts/settings', { method:'PUT', body:JSON.stringify(payload) })
 export const getNotificationBindings = () => request<NotificationBinding[]>('/notification/bindings')
 export const getNotificationStatus = () => request<NotificationStatus>('/notification/status')
-export const saveNotificationBinding = (payload:{provider:'astrbot';platform:'qq';target_id:string;enabled:boolean}) => request<NotificationBinding>('/notification/bindings',{method:'PUT',body:JSON.stringify(payload)})
+export const setAstrBotNotificationEnabled = (enabled:boolean) => request<NotificationBinding>('/notification/bindings/astrbot/qq/enabled',{method:'PUT',body:JSON.stringify({ enabled })})

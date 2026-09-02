@@ -2,9 +2,9 @@
 
 此插件是 FastAPI 电费系统与 AstrBot 的边界适配器。
 
-1. 用户在 Web 系统生成一次性绑定码，并在同一 QQ 私聊中发送 `/绑定 <绑定码>`，建立 QQ 到本系统 User 的身份关系。
+1. 用户在 Web 系统生成一次性绑定码，并在同一 QQ 私聊中发送 `/绑定 <绑定码>`；该动作同时建立 QQ 身份、通知目标与 QQ ID 到 UMO 的私聊路由。
 2. 已绑定用户可私聊发送 `/电费` 或 `/查询电费`，读取已有 SQLite 快照；不会发起北邮实时查询。
-3. 如需接收预警通知，用户仍需单独保存并启用通知 QQ ID 后发送 `/电费绑定`。插件会校验该通知目标后写入 QQ ID 到 UMO 的映射。
+3. 通知可在网页中关闭或重新开启，但网页不会要求输入或修改 QQ 号。
 4. 插件仅在 AstrBot 的插件数据目录保存 QQ ID 到 UMO 的通知路由映射。
 5. FastAPI 以 AstrBot API Key 调用受 `plugin` scope 保护的：
    `POST /api/v1/plugins/extensions/buptelec_bridge/api/send`

@@ -1,20 +1,28 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 class NotificationProvider(str, Enum): ASTRBOT = "astrbot"
 class NotificationPlatform(str, Enum): QQ = "qq"
 class NotificationStage(str, Enum): ACTIVATED = "activated"; ESCALATED = "escalated"; RESOLVED = "resolved"
 class NotificationDeliveryStatus(str, Enum): PENDING = "pending"; SUCCESS = "success"; FAILED = "failed"
-class NotificationBindingUpdate(BaseModel):
+class NotificationBindingRead(BaseModel):
+    """Read-only notification route established by QQ chat verification."""
+
+    model_config = ConfigDict(from_attributes=True)
+
     provider: NotificationProvider
     platform: NotificationPlatform
-    target_id: str = Field(pattern=r"^\d{5,20}$")
+    target_id: str
     enabled: bool
-class NotificationBindingRead(NotificationBindingUpdate):
-    model_config = ConfigDict(from_attributes=True)
     created_at: datetime
     updated_at: datetime
+
+
+class NotificationBindingEnabledUpdate(BaseModel):
+    """The QQ target is established by verified chat binding, never typed here."""
+
+    enabled: bool
 
 class NotificationStatusRead(BaseModel):
     configured: bool

@@ -9,6 +9,7 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.chat_identity_repository import ChatIdentityRepository
+from app.repositories.notification_binding_repository import NotificationBindingRepository
 from app.schemas.chat import ChatBindingCodeRead, ChatIdentityRead, ChatPlatform
 from app.schemas.common import ApiResponse, ErrorCode
 from app.services.app_session_service import utc_now
@@ -23,6 +24,7 @@ class ChatIdentityService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._repository = ChatIdentityRepository(session)
+        self._notifications = NotificationBindingRepository(session)
 
     async def get_identity(self, user_id: int, platform: ChatPlatform) -> ApiResponse[ChatIdentityRead | None]:
         identity = await self._repository.get_identity(user_id, platform.value)
@@ -38,6 +40,9 @@ class ChatIdentityService:
 
     async def delete_identity(self, user_id: int, platform: ChatPlatform) -> ApiResponse[None]:
         deleted = await self._repository.delete_identity(user_id, platform.value)
+        # A notification target is derived from the verified chat identity.  Do
+        # not leave an independently routable QQ target after it is unbound.
+        await self._notifications.delete(user_id, "astrbot", platform.value)
         await self._session.commit()
         if not deleted:
             return ApiResponse.error(ErrorCode.NOT_FOUND, "chat identity is not bound")
@@ -58,6 +63,12 @@ class ChatIdentityService:
             return ApiResponse.error(ErrorCode.BUSINESS_ERROR, "QQ identity is already bound")
 
         identity = await self._repository.save_identity(pending.user_id, platform.value, external_id, now)
+        # A user explicitly confirming a one-time binding code has opted into
+        # this QQ route.  The Settings page may later disable delivery, but it
+        # never asks the user to type the QQ number again.
+        await self._notifications.upsert(
+            pending.user_id, "astrbot", platform.value, external_id, True, now,
+        )
         self._repository.mark_pending_used(pending, now)
         await self._session.commit()
         return ApiResponse.ok(ChatIdentityRead.model_validate(identity), "chat identity bound")
