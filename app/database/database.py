@@ -28,7 +28,7 @@ SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSe
 
 async def init_db() -> None:
     """Bootstrap fresh tables, then apply versioned structural migrations."""
-    from app.models import alert, collection, electricity, notification_binding, notification_delivery, upstream_session, user  # noqa: F401 -- registers ORM metadata
+    from app.models import alert, chat_identity, collection, electricity, notification_binding, notification_delivery, upstream_session, user  # noqa: F401 -- registers ORM metadata
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)

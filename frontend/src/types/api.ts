@@ -54,3 +54,5 @@ export interface AlertEvent { id:number; area_id:string; room_id:string; buildin
 export interface AlertSettings { enabled:boolean; low_balance_enabled:boolean; balance_warning_threshold:number; balance_critical_threshold:number; low_remaining_days_enabled:boolean; remaining_days_warning_threshold:number; remaining_days_critical_threshold:number }
 export interface NotificationBinding { provider:'astrbot'; platform:'qq'; target_id:string; enabled:boolean; created_at:string; updated_at:string }
 export interface NotificationStatus { configured:boolean; enabled:boolean; last_delivery_status:'pending'|'success'|'failed'|null; last_delivery_stage:'activated'|'escalated'|'resolved'|null; last_delivery_time:string|null }
+export interface ChatIdentity { platform: 'qq'; external_id: string; verified_at: string }
+export interface ChatBindingCode { code: string; expires_at: string }

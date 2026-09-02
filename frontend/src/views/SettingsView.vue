@@ -5,7 +5,8 @@ import RoomSelector, { type RoomSelection } from '@/components/RoomSelector.vue'
 import { useDormitorySettings } from '@/composables/useDormitorySettings'
 import { ApiError } from '@/api/client'
 import { clearCollectionSettings, getAlertSettings, getCollectionSettings, getNotificationBindings, getNotificationStatus, runCollection, saveAlertSettings, saveCollectionSettings, saveNotificationBinding } from '@/api/electricity'
-import type { AlertSettings, CollectionState, NotificationBinding, NotificationStatus } from '@/types/api'
+import { createChatBindingCode, deleteChatIdentity, getChatIdentity } from '@/api/chat'
+import type { AlertSettings, ChatBindingCode, ChatIdentity, CollectionState, NotificationBinding, NotificationStatus } from '@/types/api'
 
 const emit = defineEmits<{ back: []; saved: [] }>()
 const { selectedDormitory, save, clear } = useDormitorySettings()
@@ -15,6 +16,7 @@ const collectionLoading = ref(false)
 const alertSettings = ref<AlertSettings | null>(null); const alertSaving = ref(false); const alertSaved = ref('')
 const notification = ref<NotificationBinding | null>(null); const qqId = ref(''); const notificationEnabled = ref(true); const notificationSaving = ref(false); const notificationSaved = ref('')
 const notificationStatus = ref<NotificationStatus | null>(null)
+const chatIdentity = ref<ChatIdentity | null>(null); const chatBindingCode = ref<ChatBindingCode | null>(null); const chatBindingLoading = ref(false); const chatIdentityLoading = ref(false)
 const statusText: Record<CollectionState['status'], string> = {
   never_run: '尚未运行', success: '运行成功', no_room_configured: '尚未配置宿舍', not_authenticated: '当前未登录',
   session_expired: '登录已过期', upstream_not_updated: '上游尚未更新', failed: '运行失败', already_running: '正在运行',
@@ -55,7 +57,20 @@ async function saveNotification(){
   } catch(cause) { error.value=cause instanceof ApiError?cause.message:'通知设置保存失败。' }
   finally { notificationSaving.value = false }
 }
-onMounted(() => { loadCollection(); loadAlerts(); loadNotification() })
+async function loadChatIdentity(){ try { chatIdentity.value = await getChatIdentity() } catch { chatIdentity.value = null } }
+async function createBindingCode(){
+  error.value = ''; chatBindingLoading.value = true
+  try { chatBindingCode.value = await createChatBindingCode() }
+  catch(cause) { error.value = cause instanceof ApiError ? cause.message : '绑定码生成失败，请重试。' }
+  finally { chatBindingLoading.value = false }
+}
+async function unbindChatIdentity(){
+  error.value = ''; chatIdentityLoading.value = true
+  try { await deleteChatIdentity(); chatIdentity.value = null; chatBindingCode.value = null }
+  catch(cause) { error.value = cause instanceof ApiError ? cause.message : 'QQ 解绑失败，请重试。' }
+  finally { chatIdentityLoading.value = false }
+}
+onMounted(() => { loadCollection(); loadAlerts(); loadNotification(); loadChatIdentity() })
 </script>
 
 <template>
@@ -63,5 +78,6 @@ onMounted(() => { loadCollection(); loadAlerts(); loadNotification() })
     <button class="back-button" @click="emit('back')"><ArrowLeft :size="16" />返回仪表板</button>
     <p class="eyebrow">SETTINGS</p><h1>宿舍设置</h1><p class="settings-description">选择用于面板展示和手动刷新的宿舍。仅保存宿舍标识与名称，不保存账号或密码。</p>
     <div class="settings-surface"><h2>当前宿舍</h2><p v-if="selectedDormitory" class="saved-dormitory">{{ selectedDormitory.building.name }} · {{ selectedDormitory.floor.name }} · {{ selectedDormitory.room.name }}</p><p v-else class="muted">尚未设置宿舍</p><button v-if="selectedDormitory" class="text-button" @click="clearSelection">清除当前设置</button><div class="settings-divider"></div><RoomSelector action-label="保存" @query="saveSelection" @error="error = $event" /><p v-if="error" class="inline-error query-error">{{ error }}</p><p class="setting-hint"><Check :size="14" />选择宿舍后即保存并返回仪表板。</p><div class="settings-divider"></div><div class="collection-settings"><h2>自动采集</h2><p class="muted">{{ collection?.enabled ? `每天 ${collection.scheduled_time}（北京时间）自动采集一次。` : '自动采集已在服务配置中关闭。' }}</p><p class="muted">监测宿舍：{{ collection?.room_id ? `${collection.building_name} · ${collection.floor_name} · ${collection.room_name}` : '尚未配置' }}</p><p class="collection-status">状态：{{ collection ? statusText[collection.status] : '暂时无法读取' }}</p><p class="muted">最近成功：{{ displayTime(collection?.last_success_time ?? null) }}</p><p v-if="collection && !collection.authenticated" class="inline-error">当前无法执行；需要重新登录后恢复自动采集。</p><button class="text-button" :disabled="collectionLoading" @click="testCollection">{{ collectionLoading ? '正在测试…' : '立即测试采集' }}</button></div><div class="settings-divider"></div><div v-if="alertSettings" class="collection-settings"><h2>预警设置</h2><label><input v-model="alertSettings.enabled" type="checkbox" />启用预警</label><label><input v-model="alertSettings.low_balance_enabled" type="checkbox" />余额预警</label><div class="thresholds"><label>警告（元）<input v-model.number="alertSettings.balance_warning_threshold" type="number" min="0.01" /></label><label>严重（元）<input v-model.number="alertSettings.balance_critical_threshold" type="number" min="0.01" /></label></div><label><input v-model="alertSettings.low_remaining_days_enabled" type="checkbox" />剩余天数预警</label><div class="thresholds"><label>警告（天）<input v-model.number="alertSettings.remaining_days_warning_threshold" type="number" min="0.01" /></label><label>严重（天）<input v-model.number="alertSettings.remaining_days_critical_threshold" type="number" min="0.01" /></label></div><button class="primary-button alert-save-button" :disabled="alertSaving" @click="saveAlerts">{{ alertSaving ? '正在保存…' : '保存预警设置' }}</button><p v-if="alertSaved" class="notification-saved"><Check :size="15" />{{ alertSaved }}</p></div></div>
-    <div class="settings-divider"></div><div class="collection-settings notification-settings"><h2>通知设置</h2><label><input v-model="notificationEnabled" type="checkbox" />启用 AstrBot 通知</label><label>QQ 号<input v-model="qqId" inputmode="numeric" maxlength="20" placeholder="输入 QQ 号" /></label><p class="muted">{{ notification ? `已配置 QQ：${notification.target_id}` : '未配置' }}</p><p class="muted">最近投递：{{ notificationStatus?.last_delivery_status === 'success' ? '成功' : notificationStatus?.last_delivery_status === 'failed' ? '失败' : notificationStatus?.last_delivery_status === 'pending' ? '发送中' : '暂无记录' }}</p><button class="primary-button notification-save-button" :disabled="notificationSaving" @click="saveNotification">{{ notificationSaving ? '正在保存…' : '保存通知设置' }}</button><p v-if="notificationSaved" class="notification-saved"><Check :size="15" />{{ notificationSaved }}</p></div></section>
+    <div class="settings-divider"></div><div class="collection-settings notification-settings"><h2>通知设置</h2><label><input v-model="notificationEnabled" type="checkbox" />启用 AstrBot 通知</label><label>QQ 号<input v-model="qqId" inputmode="numeric" maxlength="20" placeholder="输入 QQ 号" /></label><p class="muted">{{ notification ? `已配置 QQ：${notification.target_id}` : '未配置' }}</p><p class="muted">最近投递：{{ notificationStatus?.last_delivery_status === 'success' ? '成功' : notificationStatus?.last_delivery_status === 'failed' ? '失败' : notificationStatus?.last_delivery_status === 'pending' ? '发送中' : '暂无记录' }}</p><button class="primary-button notification-save-button" :disabled="notificationSaving" @click="saveNotification">{{ notificationSaving ? '正在保存…' : '保存通知设置' }}</button><p v-if="notificationSaved" class="notification-saved"><Check :size="15" />{{ notificationSaved }}</p></div>
+    <div class="settings-divider"></div><div class="collection-settings chat-identity-settings"><h2>QQ 机器人绑定</h2><p v-if="chatIdentity" class="muted">已绑定 QQ：{{ chatIdentity.external_id }}</p><p v-else class="muted">未绑定。绑定后可用于后续 QQ 查询身份确认；此项与通知开关独立。</p><template v-if="chatBindingCode"><p class="binding-code">{{ chatBindingCode.code }}</p><p class="muted">请在 QQ 私聊机器人发送：<code>/绑定 {{ chatBindingCode.code }}</code></p><p class="muted">绑定码有效至：{{ displayTime(chatBindingCode.expires_at) }}</p></template><button v-if="!chatIdentity" class="primary-button notification-save-button" :disabled="chatBindingLoading" @click="createBindingCode">{{ chatBindingLoading ? '正在生成…' : '生成绑定码' }}</button><button v-else class="text-button" :disabled="chatIdentityLoading" @click="unbindChatIdentity">{{ chatIdentityLoading ? '正在解绑…' : '解绑 QQ' }}</button></div></section>
 </template>
