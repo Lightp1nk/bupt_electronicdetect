@@ -1,4 +1,6 @@
-"""One minimal protected business route used to verify session reuse."""
+"""Electricity business routes."""
+
+import os
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +10,7 @@ from app.api.dependencies import get_authenticated_bupt_client, get_current_user
 from app.models.user import User
 from app.database.database import get_db_session
 from app.providers.bupt_client import BUPTClient
-from app.schemas.common import ApiResponse
+from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.dormitory import Building, Floor, Room
 from app.schemas.electricity import AlertEventRead, AlertEventStatus, AlertSettingsRead, AlertSettingsUpdate, CollectionSettingsUpdate, CollectionStatusRead, ElectricityAnalysis, ElectricityQueryRequest, ElectricityQuerySaveResult, ElectricityRecordRead
 from app.services.electricity_service import ElectricityService
@@ -71,6 +73,10 @@ async def query(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[ElectricityQuerySaveResult]:
+    if os.getenv("APP_DISABLE_UPSTREAM_QUERIES", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        result = ApiResponse.error(ErrorCode.BUSINESS_ERROR, "upstream electricity queries are disabled while test mode is active")
+        response.status_code = _status_code(result.code)
+        return result
     result = await _monitoring_service(request).query_save_and_evaluate(current_user.id, session, client,
         area_id=payload.area_id,
         building_id=payload.building_id,

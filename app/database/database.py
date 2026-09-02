@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 
 DATA_DIR = Path("data")
-DATABASE_URL = "sqlite+aiosqlite:///./data/electricity.db"
+DATABASE_URL = os.getenv("APP_DATABASE_URL", "sqlite+aiosqlite:///./data/electricity.db")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -36,7 +37,9 @@ async def init_db() -> None:
 
 def _alembic_config() -> Config:
     config = Config(str(Path("alembic.ini").resolve()))
-    config.set_main_option("sqlalchemy.url", "sqlite:///./data/electricity.db")
+    if not DATABASE_URL.startswith("sqlite+aiosqlite:///"):
+        raise ValueError("APP_DATABASE_URL must use sqlite+aiosqlite")
+    config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://", 1))
     return config
 
 

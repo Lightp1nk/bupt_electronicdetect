@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { LogOut, RefreshCw, Settings } from 'lucide-vue-next'
 import { ApiError } from '@/api/client'
-import { getActiveAlerts, getAlertSettings, getAnalysis, getHistory, queryElectricity } from '@/api/electricity'
+import { getActiveAlerts, getAlertSettings, getAnalysis, getHistory, getLatest, queryElectricity } from '@/api/electricity'
 import type { AlertEvent, AlertSettings, ElectricityAnalysis, ElectricityReading, ElectricityRecord } from '@/types/api'
 import Sidebar from '@/components/Sidebar.vue'
 import MetricOverview from '@/components/MetricOverview.vue'
@@ -35,15 +35,31 @@ async function refreshReading() {
     history.value = savedHistory; analysis.value = savedAnalysis; alerts.value = activeAlerts; alertSettings.value = settings
   } catch (cause) { error.value = cause instanceof ApiError ? cause.message : '查询当前用电信息失败，请重试。' } finally { loading.value = false }
 }
+async function loadSavedDashboard() {
+  if (props.demo) { await refreshReading(); return }
+  const value = selectedDormitory.value
+  if (!value) { active.value = '设置'; return }
+  error.value = ''; loading.value = true
+  try {
+    const [latest, savedHistory, savedAnalysis, activeAlerts, settings] = await Promise.all([
+      getLatest(value.areaId, value.room.id), getHistory(value.areaId, value.room.id), getAnalysis(value.areaId, value.room.id),
+      getActiveAlerts(value.areaId, value.room.id), getAlertSettings(),
+    ])
+    reading.value = { ...latest, raw_data: latest.raw_data_json }; history.value = savedHistory; analysis.value = savedAnalysis; alerts.value = activeAlerts; alertSettings.value = settings
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'NOT_FOUND') { alertSettings.value = await getAlertSettings(); return }
+    error.value = cause instanceof ApiError ? cause.message : '读取已保存的用电数据失败，请重试。'
+  } finally { loading.value = false }
+}
 function returnToDashboard() { active.value = '仪表板' }
 async function settingsSaved() { returnToDashboard(); await refreshReading() }
 watch(
   () => selectedDormitory.value && `${selectedDormitory.value.areaId}:${selectedDormitory.value.room.id}`,
-  (roomKey) => { if (!props.demo && roomKey) void refreshReading() },
+  (roomKey) => { if (!props.demo && roomKey) void loadSavedDashboard() },
   { immediate: true },
 )
 
-if (props.demo) void refreshReading()
+if (props.demo) void loadSavedDashboard()
 </script>
 
 <template>
