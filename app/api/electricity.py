@@ -12,7 +12,8 @@ from app.database.database import get_db_session
 from app.providers.bupt_client import BUPTClient
 from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.dormitory import Building, Floor, Room
-from app.schemas.electricity import AlertEventRead, AlertEventStatus, AlertSettingsRead, AlertSettingsUpdate, CollectionSettingsUpdate, CollectionStatusRead, ElectricityAnalysis, ElectricityQueryRequest, ElectricityQuerySaveResult, ElectricityRecordRead
+from app.schemas.electricity import AlertEventRead, AlertEventStatus, AlertSettingsRead, AlertSettingsUpdate, CollectionSettingsUpdate, CollectionStatusRead, ElectricityAnalysis, ElectricityDataSource, ElectricityQueryRequest, ElectricityQuerySaveResult, ElectricityRecordRead
+from app.data_providers.electricity import DemoElectricityDataProvider, ElectricityDataProvider, RealElectricityDataProvider
 from app.services.electricity_service import ElectricityService
 from app.services.statistics_service import StatisticsService
 from app.services.collection_service import CollectionService
@@ -26,6 +27,16 @@ router = APIRouter(prefix="/api/v1/electricity", tags=["electricity"])
 def _collection_service(request: Request) -> CollectionService:
     return request.app.state.collection_service
 def _monitoring_service(request: Request) -> MonitoringService: return request.app.state.monitoring_service
+
+
+def _demo_mode_enabled() -> bool:
+    return os.getenv("DEMO_MODE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_provider(session: AsyncSession, source: ElectricityDataSource) -> ElectricityDataProvider | None:
+    if source == ElectricityDataSource.DEMO:
+        return DemoElectricityDataProvider() if _demo_mode_enabled() else None
+    return RealElectricityDataProvider(session)
 
 
 @router.get("/buildings", response_model=ApiResponse[list[Building]])
@@ -108,9 +119,12 @@ async def history(
     response: Response,
     days: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1),
+    source: ElectricityDataSource = Query(default=ElectricityDataSource.REAL),
     session: AsyncSession = Depends(get_db_session),
+    _: User = Depends(get_current_user),
 ) -> ApiResponse[list[ElectricityRecordRead]]:
-    result = await ElectricityService(session).get_history(area_id=area_id, room_id=room_id, days=days, limit=limit)
+    provider = _read_provider(session, source)
+    result = ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "demo mode is not enabled") if provider is None else await ElectricityService(session, read_provider=provider).get_history(area_id=area_id, room_id=room_id, days=days, limit=limit)
     response.status_code = _status_code(result.code)
     return result
 
@@ -120,9 +134,12 @@ async def latest(
     room_id: str,
     area_id: str,
     response: Response,
+    source: ElectricityDataSource = Query(default=ElectricityDataSource.REAL),
     session: AsyncSession = Depends(get_db_session),
+    _: User = Depends(get_current_user),
 ) -> ApiResponse[ElectricityRecordRead]:
-    result = await ElectricityService(session).get_latest(area_id=area_id, room_id=room_id)
+    provider = _read_provider(session, source)
+    result = ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "demo mode is not enabled") if provider is None else await ElectricityService(session, read_provider=provider).get_latest(area_id=area_id, room_id=room_id)
     response.status_code = _status_code(result.code)
     return result
 
@@ -132,9 +149,12 @@ async def analysis(
     room_id: str,
     area_id: str,
     response: Response,
+    source: ElectricityDataSource = Query(default=ElectricityDataSource.REAL),
     session: AsyncSession = Depends(get_db_session),
+    _: User = Depends(get_current_user),
 ) -> ApiResponse[ElectricityAnalysis]:
-    result = await StatisticsService(session).get_analysis(area_id=area_id, room_id=room_id)
+    provider = _read_provider(session, source)
+    result = ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "demo mode is not enabled") if provider is None else await StatisticsService(data_provider=provider).get_analysis(area_id=area_id, room_id=room_id)
     response.status_code = _status_code(result.code)
     return result
 

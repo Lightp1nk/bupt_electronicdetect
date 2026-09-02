@@ -9,8 +9,7 @@ from datetime import date, datetime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.electricity import ElectricityRecord
-from app.repositories.electricity_repository import ElectricityRepository
+from app.data_providers.electricity import ElectricityDataProvider, RealElectricityDataProvider
 from app.schemas.common import ApiResponse, ErrorCode
 from app.schemas.electricity import (
     DailyUsageRead,
@@ -54,15 +53,19 @@ class UsageCalculation:
 class StatisticsService:
     """Read existing snapshots and calculate statistics without persisting derived data."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self._repository = ElectricityRepository(session)
+    def __init__(self, session: AsyncSession | None = None, *, data_provider: ElectricityDataProvider | None = None) -> None:
+        if data_provider is None:
+            if session is None:
+                raise ValueError("a session is required for the real electricity data provider")
+            data_provider = RealElectricityDataProvider(session)
+        self._data_provider = data_provider
 
     async def get_analysis(self, *, area_id: str, room_id: str) -> ApiResponse[ElectricityAnalysis]:
         if not area_id or not room_id:
             return ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "area_id and room_id are required")
         try:
-            records = await self._repository.get_history(area_id, room_id)
-            current = await self._repository.get_latest(area_id, room_id)
+            records = await self._data_provider.get_history(area_id, room_id)
+            current = await self._data_provider.get_latest(area_id, room_id)
         except SQLAlchemyError:
             return ApiResponse.error(ErrorCode.DATABASE_ERROR, "analysis history could not be read")
         if current is None:

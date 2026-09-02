@@ -1,0 +1,561 @@
+{
+  "dataset": "synthetic-demo-v1",
+  "room": {
+    "area_id": "demo-shahe",
+    "building_id": "demo-yanbeiyuan-a",
+    "building_name": "沙河校区雁北园 A 楼",
+    "floor_id": "4",
+    "floor_name": "4 层",
+    "room_id": "demo-419",
+    "room_name": "A 楼 419"
+  },
+  "records": [
+    {
+      "source_time": "2026-06-04T04:05:00",
+      "total_usage_kwh": 7840,
+      "remaining_kwh": 486,
+      "remaining_money": 156
+    },
+    {
+      "source_time": "2026-06-05T04:05:00",
+      "total_usage_kwh": 7844.4,
+      "remaining_kwh": 481.6,
+      "remaining_money": 154.61
+    },
+    {
+      "source_time": "2026-06-06T04:05:00",
+      "total_usage_kwh": 7849.75,
+      "remaining_kwh": 476.25,
+      "remaining_money": 152.92
+    },
+    {
+      "source_time": "2026-06-07T04:05:00",
+      "total_usage_kwh": 7855.25,
+      "remaining_kwh": 470.75,
+      "remaining_money": 151.19
+    },
+    {
+      "source_time": "2026-06-08T04:05:00",
+      "total_usage_kwh": 7861.2,
+      "remaining_kwh": 464.8,
+      "remaining_money": 149.32
+    },
+    {
+      "source_time": "2026-06-09T04:05:00",
+      "total_usage_kwh": 7866.6,
+      "remaining_kwh": 459.4,
+      "remaining_money": 147.62
+    },
+    {
+      "source_time": "2026-06-10T04:05:00",
+      "total_usage_kwh": 7871.75,
+      "remaining_kwh": 454.25,
+      "remaining_money": 146
+    },
+    {
+      "source_time": "2026-06-11T04:05:00",
+      "total_usage_kwh": 7876.35,
+      "remaining_kwh": 449.65,
+      "remaining_money": 144.55
+    },
+    {
+      "source_time": "2026-06-12T04:05:00",
+      "total_usage_kwh": 7881.6,
+      "remaining_kwh": 444.4,
+      "remaining_money": 142.9
+    },
+    {
+      "source_time": "2026-06-13T04:05:00",
+      "total_usage_kwh": 7887.2,
+      "remaining_kwh": 438.8,
+      "remaining_money": 141.14
+    },
+    {
+      "source_time": "2026-06-14T04:05:00",
+      "total_usage_kwh": 7892.45,
+      "remaining_kwh": 433.55,
+      "remaining_money": 139.49
+    },
+    {
+      "source_time": "2026-06-15T04:05:00",
+      "total_usage_kwh": 7898.05,
+      "remaining_kwh": 427.95,
+      "remaining_money": 137.73
+    },
+    {
+      "source_time": "2026-06-16T04:05:00",
+      "total_usage_kwh": 7904.3,
+      "remaining_kwh": 421.7,
+      "remaining_money": 135.76
+    },
+    {
+      "source_time": "2026-06-17T04:05:00",
+      "total_usage_kwh": 7909.3,
+      "remaining_kwh": 416.7,
+      "remaining_money": 134.19
+    },
+    {
+      "source_time": "2026-06-18T04:05:00",
+      "total_usage_kwh": 7914.35,
+      "remaining_kwh": 411.65,
+      "remaining_money": 132.6
+    },
+    {
+      "source_time": "2026-06-19T04:05:00",
+      "total_usage_kwh": 7919.05,
+      "remaining_kwh": 406.95,
+      "remaining_money": 131.12
+    },
+    {
+      "source_time": "2026-06-20T04:05:00",
+      "total_usage_kwh": 7924.1,
+      "remaining_kwh": 401.9,
+      "remaining_money": 129.53
+    },
+    {
+      "source_time": "2026-06-21T04:05:00",
+      "total_usage_kwh": 7929.3,
+      "remaining_kwh": 396.7,
+      "remaining_money": 127.89
+    },
+    {
+      "source_time": "2026-06-22T04:05:00",
+      "total_usage_kwh": 7935.55,
+      "remaining_kwh": 390.45,
+      "remaining_money": 125.92
+    },
+    {
+      "source_time": "2026-06-23T04:05:00",
+      "total_usage_kwh": 7941.25,
+      "remaining_kwh": 384.75,
+      "remaining_money": 124.12
+    },
+    {
+      "source_time": "2026-06-24T04:05:00",
+      "total_usage_kwh": 7946.1,
+      "remaining_kwh": 379.9,
+      "remaining_money": 122.59
+    },
+    {
+      "source_time": "2026-06-25T04:05:00",
+      "total_usage_kwh": 7950.4,
+      "remaining_kwh": 375.6,
+      "remaining_money": 121.24
+    },
+    {
+      "source_time": "2026-06-26T04:05:00",
+      "total_usage_kwh": 7955.95,
+      "remaining_kwh": 370.05,
+      "remaining_money": 119.49
+    },
+    {
+      "source_time": "2026-06-27T04:05:00",
+      "total_usage_kwh": 7961.85,
+      "remaining_kwh": 364.15,
+      "remaining_money": 117.63
+    },
+    {
+      "source_time": "2026-06-28T04:05:00",
+      "total_usage_kwh": 7966.8,
+      "remaining_kwh": 359.2,
+      "remaining_money": 116.07
+    },
+    {
+      "source_time": "2026-06-29T04:05:00",
+      "total_usage_kwh": 7972.1,
+      "remaining_kwh": 353.9,
+      "remaining_money": 114.4
+    },
+    {
+      "source_time": "2026-06-30T04:05:00",
+      "total_usage_kwh": 7978.65,
+      "remaining_kwh": 347.35,
+      "remaining_money": 112.34
+    },
+    {
+      "source_time": "2026-07-01T04:05:00",
+      "total_usage_kwh": 7983.95,
+      "remaining_kwh": 342.05,
+      "remaining_money": 110.67
+    },
+    {
+      "source_time": "2026-07-02T04:05:00",
+      "total_usage_kwh": 7988.7,
+      "remaining_kwh": 337.3,
+      "remaining_money": 109.17
+    },
+    {
+      "source_time": "2026-07-03T04:05:00",
+      "total_usage_kwh": 7993.1,
+      "remaining_kwh": 332.9,
+      "remaining_money": 107.78
+    },
+    {
+      "source_time": "2026-07-04T04:05:00",
+      "total_usage_kwh": 7998.45,
+      "remaining_kwh": 327.55,
+      "remaining_money": 106.09
+    },
+    {
+      "source_time": "2026-07-05T04:05:00",
+      "total_usage_kwh": 8003.95,
+      "remaining_kwh": 322.05,
+      "remaining_money": 104.36
+    },
+    {
+      "source_time": "2026-07-06T04:05:00",
+      "total_usage_kwh": 8009.9,
+      "remaining_kwh": 316.1,
+      "remaining_money": 102.49
+    },
+    {
+      "source_time": "2026-07-07T04:05:00",
+      "total_usage_kwh": 8015.3,
+      "remaining_kwh": 310.7,
+      "remaining_money": 100.79
+    },
+    {
+      "source_time": "2026-07-08T04:05:00",
+      "total_usage_kwh": 8020.45,
+      "remaining_kwh": 305.55,
+      "remaining_money": 99.17
+    },
+    {
+      "source_time": "2026-07-09T04:05:00",
+      "total_usage_kwh": 8025.05,
+      "remaining_kwh": 300.95,
+      "remaining_money": 97.72
+    },
+    {
+      "source_time": "2026-07-10T04:05:00",
+      "total_usage_kwh": 8030.3,
+      "remaining_kwh": 295.7,
+      "remaining_money": 96.07
+    },
+    {
+      "source_time": "2026-07-11T04:05:00",
+      "total_usage_kwh": 8035.9,
+      "remaining_kwh": 290.1,
+      "remaining_money": 94.31
+    },
+    {
+      "source_time": "2026-07-12T04:05:00",
+      "total_usage_kwh": 8041.15,
+      "remaining_kwh": 284.85,
+      "remaining_money": 92.66
+    },
+    {
+      "source_time": "2026-07-13T04:05:00",
+      "total_usage_kwh": 8046.75,
+      "remaining_kwh": 279.25,
+      "remaining_money": 90.9
+    },
+    {
+      "source_time": "2026-07-14T04:05:00",
+      "total_usage_kwh": 8053,
+      "remaining_kwh": 273,
+      "remaining_money": 88.93
+    },
+    {
+      "source_time": "2026-07-15T04:05:00",
+      "total_usage_kwh": 8058,
+      "remaining_kwh": 268,
+      "remaining_money": 87.36
+    },
+    {
+      "source_time": "2026-07-16T04:05:00",
+      "total_usage_kwh": 8063.05,
+      "remaining_kwh": 262.95,
+      "remaining_money": 85.77
+    },
+    {
+      "source_time": "2026-07-17T04:05:00",
+      "total_usage_kwh": 8067.75,
+      "remaining_kwh": 258.25,
+      "remaining_money": 84.29
+    },
+    {
+      "source_time": "2026-07-18T04:05:00",
+      "total_usage_kwh": 8072.8,
+      "remaining_kwh": 253.2,
+      "remaining_money": 82.7
+    },
+    {
+      "source_time": "2026-07-19T04:05:00",
+      "total_usage_kwh": 8078,
+      "remaining_kwh": 248,
+      "remaining_money": 81.06
+    },
+    {
+      "source_time": "2026-07-20T04:05:00",
+      "total_usage_kwh": 8084.25,
+      "remaining_kwh": 241.75,
+      "remaining_money": 79.09
+    },
+    {
+      "source_time": "2026-07-21T04:05:00",
+      "total_usage_kwh": 8089.95,
+      "remaining_kwh": 236.05,
+      "remaining_money": 77.29
+    },
+    {
+      "source_time": "2026-07-22T04:05:00",
+      "total_usage_kwh": 8094.8,
+      "remaining_kwh": 231.2,
+      "remaining_money": 75.76
+    },
+    {
+      "source_time": "2026-07-23T04:05:00",
+      "total_usage_kwh": 8099.1,
+      "remaining_kwh": 226.9,
+      "remaining_money": 74.41
+    },
+    {
+      "source_time": "2026-07-24T04:05:00",
+      "total_usage_kwh": 8104.65,
+      "remaining_kwh": 221.35,
+      "remaining_money": 72.66
+    },
+    {
+      "source_time": "2026-07-25T04:05:00",
+      "total_usage_kwh": 8110.55,
+      "remaining_kwh": 215.45,
+      "remaining_money": 70.8
+    },
+    {
+      "source_time": "2026-07-26T04:05:00",
+      "total_usage_kwh": 8115.5,
+      "remaining_kwh": 210.5,
+      "remaining_money": 69.24
+    },
+    {
+      "source_time": "2026-07-27T04:05:00",
+      "total_usage_kwh": 8120.8,
+      "remaining_kwh": 205.2,
+      "remaining_money": 67.57
+    },
+    {
+      "source_time": "2026-07-28T04:05:00",
+      "total_usage_kwh": 8127.35,
+      "remaining_kwh": 198.65,
+      "remaining_money": 65.51
+    },
+    {
+      "source_time": "2026-07-29T04:05:00",
+      "total_usage_kwh": 8132.65,
+      "remaining_kwh": 193.35,
+      "remaining_money": 63.84
+    },
+    {
+      "source_time": "2026-07-30T04:05:00",
+      "total_usage_kwh": 8137.4,
+      "remaining_kwh": 188.6,
+      "remaining_money": 62.34
+    },
+    {
+      "source_time": "2026-07-31T04:05:00",
+      "total_usage_kwh": 8141.8,
+      "remaining_kwh": 184.2,
+      "remaining_money": 60.95
+    },
+    {
+      "source_time": "2026-08-01T04:05:00",
+      "total_usage_kwh": 8147.15,
+      "remaining_kwh": 178.85,
+      "remaining_money": 59.26
+    },
+    {
+      "source_time": "2026-08-02T04:05:00",
+      "total_usage_kwh": 8162.95,
+      "remaining_kwh": 163.05,
+      "remaining_money": 54.28,
+      "scenario": "high_usage_demo"
+    },
+    {
+      "source_time": "2026-08-03T04:05:00",
+      "total_usage_kwh": 8171.65,
+      "remaining_kwh": 154.35,
+      "remaining_money": 51.54
+    },
+    {
+      "source_time": "2026-08-04T04:05:00",
+      "total_usage_kwh": 8177.05,
+      "remaining_kwh": 148.95,
+      "remaining_money": 49.84
+    },
+    {
+      "source_time": "2026-08-05T04:05:00",
+      "total_usage_kwh": 8182.2,
+      "remaining_kwh": 143.8,
+      "remaining_money": 48.22
+    },
+    {
+      "source_time": "2026-08-06T04:05:00",
+      "total_usage_kwh": 8186.8,
+      "remaining_kwh": 139.2,
+      "remaining_money": 46.77
+    },
+    {
+      "source_time": "2026-08-07T04:05:00",
+      "total_usage_kwh": 8192.05,
+      "remaining_kwh": 133.95,
+      "remaining_money": 45.12
+    },
+    {
+      "source_time": "2026-08-08T04:05:00",
+      "total_usage_kwh": 8197.65,
+      "remaining_kwh": 128.35,
+      "remaining_money": 43.36
+    },
+    {
+      "source_time": "2026-08-09T04:05:00",
+      "total_usage_kwh": 8202.9,
+      "remaining_kwh": 123.1,
+      "remaining_money": 41.71
+    },
+    {
+      "source_time": "2026-08-10T04:05:00",
+      "total_usage_kwh": 8208.5,
+      "remaining_kwh": 117.5,
+      "remaining_money": 39.95
+    },
+    {
+      "source_time": "2026-08-11T04:05:00",
+      "total_usage_kwh": 8214.75,
+      "remaining_kwh": 111.25,
+      "remaining_money": 37.98
+    },
+    {
+      "source_time": "2026-08-12T04:05:00",
+      "total_usage_kwh": 8219.75,
+      "remaining_kwh": 106.25,
+      "remaining_money": 36.4
+    },
+    {
+      "source_time": "2026-08-13T04:05:00",
+      "total_usage_kwh": 8224.8,
+      "remaining_kwh": 101.2,
+      "remaining_money": 34.81
+    },
+    {
+      "source_time": "2026-08-14T04:05:00",
+      "total_usage_kwh": 8229.5,
+      "remaining_kwh": 96.5,
+      "remaining_money": 33.33
+    },
+    {
+      "source_time": "2026-08-15T04:05:00",
+      "total_usage_kwh": 8234.55,
+      "remaining_kwh": 91.45,
+      "remaining_money": 31.74
+    },
+    {
+      "source_time": "2026-08-16T04:05:00",
+      "total_usage_kwh": 8239.75,
+      "remaining_kwh": 86.25,
+      "remaining_money": 30.1
+    },
+    {
+      "source_time": "2026-08-17T04:05:00",
+      "total_usage_kwh": 8246,
+      "remaining_kwh": 80,
+      "remaining_money": 28.13
+    },
+    {
+      "source_time": "2026-08-18T04:05:00",
+      "total_usage_kwh": 8251.7,
+      "remaining_kwh": 74.3,
+      "remaining_money": 26.33
+    },
+    {
+      "source_time": "2026-08-19T04:05:00",
+      "total_usage_kwh": 8259.1,
+      "remaining_kwh": 66.9,
+      "remaining_money": 24
+    },
+    {
+      "source_time": "2026-08-20T04:05:00",
+      "total_usage_kwh": 8263.4,
+      "remaining_kwh": 62.6,
+      "remaining_money": 22.65
+    },
+    {
+      "source_time": "2026-08-21T04:05:00",
+      "total_usage_kwh": 8268.95,
+      "remaining_kwh": 57.05,
+      "remaining_money": 20.9
+    },
+    {
+      "source_time": "2026-08-22T04:05:00",
+      "total_usage_kwh": 8274.85,
+      "remaining_kwh": 51.15,
+      "remaining_money": 19.04
+    },
+    {
+      "source_time": "2026-08-23T04:05:00",
+      "total_usage_kwh": 8279.8,
+      "remaining_kwh": 46.2,
+      "remaining_money": 17.48
+    },
+    {
+      "source_time": "2026-08-24T04:05:00",
+      "total_usage_kwh": 8285.1,
+      "remaining_kwh": 40.9,
+      "remaining_money": 15.81
+    },
+    {
+      "source_time": "2026-08-25T04:05:00",
+      "total_usage_kwh": 8291.65,
+      "remaining_kwh": 34.35,
+      "remaining_money": 13.75
+    },
+    {
+      "source_time": "2026-08-26T04:05:00",
+      "total_usage_kwh": 8296.95,
+      "remaining_kwh": 29.05,
+      "remaining_money": 12.08
+    },
+    {
+      "source_time": "2026-08-27T04:05:00",
+      "total_usage_kwh": 8301.7,
+      "remaining_kwh": 24.3,
+      "remaining_money": 10.58
+    },
+    {
+      "source_time": "2026-08-28T04:05:00",
+      "total_usage_kwh": 8306.1,
+      "remaining_kwh": 19.9,
+      "remaining_money": 9.19
+    },
+    {
+      "source_time": "2026-08-29T04:05:00",
+      "total_usage_kwh": 8311.45,
+      "remaining_kwh": 14.55,
+      "remaining_money": 7.5
+    },
+    {
+      "source_time": "2026-08-30T04:05:00",
+      "total_usage_kwh": 8316.95,
+      "remaining_kwh": 9.05,
+      "remaining_money": 5.77
+    },
+    {
+      "source_time": "2026-08-31T04:05:00",
+      "total_usage_kwh": 8322.9,
+      "remaining_kwh": 3.1,
+      "remaining_money": 3.9
+    },
+    {
+      "source_time": "2026-09-01T04:05:00",
+      "total_usage_kwh": 8328.3,
+      "remaining_kwh": -2.3,
+      "remaining_money": 2.2
+    },
+    {
+      "source_time": "2026-09-02T04:05:00",
+      "total_usage_kwh": 8333.45,
+      "remaining_kwh": -7.45,
+      "remaining_money": 0.58
+    }
+  ]
+}

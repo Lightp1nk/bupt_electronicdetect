@@ -10,7 +10,6 @@ const demoMode = new URLSearchParams(window.location.search).get('demo') === '1'
 async function checkStatus() { try { authenticated.value = (await getStatus()).authenticated } catch { authenticated.value = false } finally { ready.value = true } }
 async function signOut() { try { await logout() } finally { authenticated.value = false } }
 onMounted(() => {
-  if (demoMode) { authenticated.value = true; ready.value = true; return }
   checkStatus()
 })
 </script>

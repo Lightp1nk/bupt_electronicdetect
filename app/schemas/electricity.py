@@ -33,6 +33,11 @@ class ElectricityQueryRequest(BaseModel):
     room_name: str | None = None
 
 
+class ElectricityDataSource(str, Enum):
+    REAL = "real"
+    DEMO = "demo"
+
+
 class ElectricityRecordRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

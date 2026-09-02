@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.data_providers.electricity import ElectricityDataProvider, RealElectricityDataProvider
 from app.models.electricity import ElectricityRecord
 from app.providers.bupt_client import BUPTClient
 from app.repositories.electricity_repository import ElectricityRepository
@@ -21,9 +22,10 @@ BEIJING_TZ = ZoneInfo("Asia/Shanghai")
 class ElectricityService:
     """Coordinates provider reads and snapshot persistence; it owns commit/rollback."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, read_provider: ElectricityDataProvider | None = None) -> None:
         self._session = session
         self._repository = ElectricityRepository(session)
+        self._read_provider = read_provider or RealElectricityDataProvider(session)
 
     async def query_and_save(
         self,
@@ -98,8 +100,8 @@ class ElectricityService:
             return ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "limit must be positive")
         since = local_now() - timedelta(days=days) if days is not None else None
         try:
-            records = await self._repository.get_history(area_id, room_id, since=since, limit=limit)
-            return ApiResponse.ok([record_to_read(record) for record in records])
+            records = await self._read_provider.get_history(area_id, room_id, since=since, limit=limit)
+            return ApiResponse.ok(list(records))
         except SQLAlchemyError:
             return ApiResponse.error(ErrorCode.DATABASE_ERROR, "history could not be read")
 
@@ -107,10 +109,10 @@ class ElectricityService:
         if not area_id or not room_id:
             return ApiResponse.error(ErrorCode.INVALID_ARGUMENT, "area_id and room_id are required")
         try:
-            record = await self._repository.get_latest(area_id, room_id)
+            record = await self._read_provider.get_latest(area_id, room_id)
             if record is None:
                 return ApiResponse.error(ErrorCode.NOT_FOUND, "no saved electricity history for this room")
-            return ApiResponse.ok(record_to_read(record))
+            return ApiResponse.ok(record)
         except SQLAlchemyError:
             return ApiResponse.error(ErrorCode.DATABASE_ERROR, "latest record could not be read")
 

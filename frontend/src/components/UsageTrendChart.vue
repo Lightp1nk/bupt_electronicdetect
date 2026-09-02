@@ -6,7 +6,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ElectricityRecord } from '@/types/api'
 
-const props = defineProps<{ records: ElectricityRecord[]; field: 'total_usage_kwh' | 'remaining_money'; title: string; unit: string }>()
+const props = withDefaults(defineProps<{ records: ElectricityRecord[]; field: 'total_usage_kwh' | 'remaining_money'; title: string; unit: string; demo?: boolean }>(), { demo: false })
 const container = ref<HTMLDivElement | null>(null)
 let chart: ECharts | null = null
 use([LineChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -31,5 +31,5 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); chart?.dis
 </script>
 
 <template>
-  <section class="data-section trend-section"><header class="section-header"><div><h2>{{ title }}</h2><p>来自本地历史快照</p></div></header><div v-if="hasData()" ref="container" class="chart"></div><div v-else class="chart-empty">暂无足够的历史用电数据</div></section>
+  <section class="data-section trend-section"><header class="section-header"><div><h2>{{ title }}</h2><p>{{ demo ? '来自后端演示快照' : '来自本地历史快照' }}</p></div></header><div v-if="hasData()" ref="container" class="chart"></div><div v-else class="chart-empty">暂无足够的历史用电数据</div></section>
 </template>

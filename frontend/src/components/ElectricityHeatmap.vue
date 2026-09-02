@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = withDefaults(defineProps<{ dailyUsage?: Record<string, number>; demo?: boolean }>(), { dailyUsage: () => ({}), demo: false })
+const props = withDefaults(defineProps<{ dailyUsage?: Record<string, number>; demo?: boolean; anomalyDates?: string[] }>(), { dailyUsage: () => ({}), demo: false, anomalyDates: () => [] })
 
 const days = ['一', '二', '三', '四', '五', '六', '日']
 const millisecondsPerDay = 86_400_000
@@ -20,6 +20,7 @@ const displayDate = (date: Date) => `${date.getMonth() + 1}月${date.getDate()}�
 const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 const hasData = computed(() => Object.keys(props.dailyUsage).length > 0)
 const usageOf = (date: Date) => props.dailyUsage[dateKey(date)]
+const isDemoAnomaly = (date: Date) => props.demo && props.anomalyDates.includes(dateKey(date))
 const usageThresholds = computed(() => {
   const values = Object.values(props.dailyUsage).filter((value) => Number.isFinite(value)).sort((left, right) => left - right)
   if (values.length < 2 || values[0] === values[values.length - 1]) return []
@@ -49,12 +50,12 @@ const heatLevel = (date: Date) => {
         <div class="heatmap-main">
           <div class="month-labels"><span v-for="month in monthLabels" :key="month.index" :style="{ left: `${Math.floor(month.index / 7) * 24}px` }">{{ month.label }}</span></div>
           <div class="heatmap-grid">
-            <span v-for="cell in cells" :key="cell.index" class="heatmap-cell" :class="`heat-${heatLevel(cell.date)}`" :title="usageOf(cell.date) === undefined ? `${displayDate(cell.date)}：暂无完整用电数据` : `${displayDate(cell.date)}：${usageOf(cell.date)} kWh`"></span>
+            <span v-for="cell in cells" :key="cell.index" class="heatmap-cell" :class="[`heat-${heatLevel(cell.date)}`, { 'heat-anomaly': isDemoAnomaly(cell.date) }]" :title="usageOf(cell.date) === undefined ? `${displayDate(cell.date)}：暂无完整用电数据` : `${displayDate(cell.date)}：${usageOf(cell.date)} kWh${isDemoAnomaly(cell.date) ? '（演示异常用电）' : ''}`"></span>
           </div>
         </div>
       </div>
     </div>
-    <div v-if="hasData" class="heatmap-legend" aria-label="热力图颜色说明"><span>较低</span><i class="heat-lowest"></i><i class="heat-low"></i><i class="heat-medium"></i><i class="heat-high"></i><i class="heat-highest"></i><span>较高</span></div>
+    <div v-if="hasData" class="heatmap-legend" aria-label="热力图颜色说明"><span>较低</span><i class="heat-lowest"></i><i class="heat-low"></i><i class="heat-medium"></i><i class="heat-high"></i><i class="heat-highest"></i><span>较高</span><template v-if="demo && anomalyDates.length"><i class="heat-anomaly"></i><span>异常用电演示</span></template></div>
     <p class="empty-note">{{ demo ? '示例数据仅用于检查布局与图表，不会写入本地数据库。' : hasData ? '仅显示由相邻 source_date 快照推导出的真实每日耗电量；颜色按当前可用数据的分位数动态细分，缺失日期保持空白。' : '正在积累每日用电数据。统计服务将在上游时间规律完成验证后接入。' }}</p>
   </section>
 </template>

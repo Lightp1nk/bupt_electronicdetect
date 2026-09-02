@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Bot, Settings } from 'lucide-vue-next'
 
-defineProps<{ active: string; connected: boolean; updatedAt: string | null }>()
+const props = withDefaults(defineProps<{ active: string; connected: boolean; updatedAt: string | null; demo?: boolean }>(), { demo: false })
 const emit = defineEmits<{ navigate: [name: string] }>()
-const items = [{ name: '设置', icon: Settings }, { name: 'AstrBot 接入', icon: Bot }]
+const items = computed(() => props.demo ? [] : [{ name: '设置', icon: Settings }, { name: 'AstrBot 接入', icon: Bot }])
 </script>
 
 <template>
@@ -16,7 +17,7 @@ const items = [{ name: '设置', icon: Settings }, { name: 'AstrBot 接入', ico
     </nav>
     <div class="sidebar-status">
       <span class="connection-dot" :class="{ online: connected }"></span>
-      <span>{{ connected ? '认证连接正常' : '未连接' }}</span>
+      <span>{{ demo ? '演示模式（只读）' : connected ? '认证连接正常' : '未连接' }}</span>
     </div>
   </aside>
 </template>

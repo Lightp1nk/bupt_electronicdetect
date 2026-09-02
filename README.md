@@ -71,6 +71,16 @@ $env:COLLECTION_MAX_CONCURRENCY = "3"
 
 The older `ELECTRICITY_COLLECTION_*` variables remain accepted for compatibility. A missed run is eligible for only a five-minute grace period, so starting the server much later in the morning does not run an obsolete collection job.
 
+## Read-only demonstration data
+
+The production dashboard reads only `electricity_records` by default. To explicitly enable the separate demonstration dataset, set the server-only environment variable below and visit the authenticated dashboard with `?demo=1`:
+
+```powershell
+$env:DEMO_MODE_ENABLED = "true"
+```
+
+Demo data is loaded from `app/demo_data/demo_electricity_history.json`; it is never written to SQLite and never reaches collection, Alert, Notification, or AstrBot flows. Keep `DEMO_MODE_ENABLED` unset or `false` in normal production operation.
+
 ## AstrBot Bridge notifications
 
 The application sends notification bindings' QQ IDs to a trusted internal Bridge; it does not construct or persist AstrBot UMO values and does not call AstrBot's official IM API. Configure the Bridge only through server environment variables:

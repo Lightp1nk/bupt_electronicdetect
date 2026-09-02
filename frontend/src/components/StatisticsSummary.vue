@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ElectricityAnalysis } from '@/types/api'
 
-const props = defineProps<{ analysis?: ElectricityAnalysis | null; dailyUsage?: Record<string, number>; demo?: boolean }>()
+const props = defineProps<{ analysis?: ElectricityAnalysis | null }>()
 const values = () => {
   if (props.analysis) {
     const { statistics, prediction } = props.analysis
@@ -14,10 +14,7 @@ const values = () => {
       prediction.estimated_remaining_days === null ? '数据积累中' : `约 ${prediction.estimated_remaining_days.toFixed(1)} 天`,
     ]
   }
-  const data = Object.values(props.dailyUsage ?? {})
-  if (!data.length) return ['数据积累中', '数据积累中', '数据积累中', '数据积累中']
-  const avg = (days: number) => (data.slice(-days).reduce((sum, value) => sum + value, 0) / Math.min(days, data.length)).toFixed(1)
-  return [`${data[data.length - 1]?.toFixed(1)} kWh`, `${avg(3)} kWh`, `${avg(7)} kWh`, '约 38 天']
+  return ['数据积累中', '数据积累中', '数据积累中', '数据积累中']
 }
 const items = ['今日用电', '近 3 日平均', '近 7 日平均', '预计可用时间']
 </script>

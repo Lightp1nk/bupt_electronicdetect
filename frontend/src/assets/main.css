@@ -28,7 +28,9 @@
 .heatmap-cell { border-radius:4px;background:#f0f0f1 }
 .heat-lowest { background:#d9f0dc }.heat-low { background:#b9e0bf }.heat-medium { background:#85ca91 }.heat-high { background:#4baa61 }.heat-highest { background:#177b32 }
 .heatmap-cell.heat-lowest { background:#d9f0dc }.heatmap-cell.heat-low { background:#b9e0bf }.heatmap-cell.heat-medium { background:#85ca91 }.heatmap-cell.heat-high { background:#4baa61 }.heatmap-cell.heat-highest { background:#177b32 }
+.heatmap-cell.heat-anomaly{background:#d1242f;outline:1px solid #8f111b}
 .heatmap-legend{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:14px;color:var(--text-tertiary);font-size:11px}.heatmap-legend i{display:block;width:13px;height:13px;border-radius:3px}
+.demo-mode-notice{margin:-8px 0 22px;padding:12px 14px;border:1px solid #f0c36d;border-radius:var(--radius-sm);background:#fff8e6;color:#8a5a00;font-size:13px;line-height:1.55}.demo-badge{border-color:#f0c36d;background:#fff8e6;color:#8a5a00}
 .empty-note { text-align:center;margin:14px 0 0 }
 .statistics-summary { margin-bottom:16px }
 .trends { gap:16px }
