@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { LogOut, RefreshCw, Settings } from 'lucide-vue-next'
 import { ApiError } from '@/api/client'
 import { getActiveAlerts, getAlertSettings, getAnalysis, getHistory, queryElectricity } from '@/api/electricity'
@@ -37,9 +37,13 @@ async function refreshReading() {
 }
 function returnToDashboard() { active.value = '仪表板' }
 async function settingsSaved() { returnToDashboard(); await refreshReading() }
-onMounted(() => {
-  if (props.demo || selectedDormitory.value) refreshReading()
-})
+watch(
+  () => selectedDormitory.value && `${selectedDormitory.value.areaId}:${selectedDormitory.value.room.id}`,
+  (roomKey) => { if (!props.demo && roomKey) void refreshReading() },
+  { immediate: true },
+)
+
+if (props.demo) void refreshReading()
 </script>
 
 <template>
