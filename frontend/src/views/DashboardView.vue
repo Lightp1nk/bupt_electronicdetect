@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { LogOut, RefreshCw, Settings } from 'lucide-vue-next'
 import { ApiError } from '@/api/client'
 import { getActiveAlerts, getAlertSettings, getAnalysis, getHistory, queryElectricity } from '@/api/electricity'
@@ -37,13 +37,15 @@ async function refreshReading() {
 }
 function returnToDashboard() { active.value = '仪表板' }
 async function settingsSaved() { returnToDashboard(); await refreshReading() }
-if (props.demo) { refreshReading() }
+onMounted(() => {
+  if (props.demo || selectedDormitory.value) refreshReading()
+})
 </script>
 
 <template>
   <div class="app-shell"><Sidebar :active="active" :connected="true" :updated-at="updatedAt" @navigate="active = $event" />
     <main class="workspace"><header class="page-header"><div><p class="eyebrow">OVERVIEW</p><h1>宿舍用电监测</h1><p v-if="dashboardDormitory">{{ dashboardDormitory.building.name }} · {{ dashboardDormitory.floor.name }} · {{ dashboardDormitory.room.name }}</p><p v-else>请先在设置中选择宿舍</p></div><div class="header-actions"><span v-if="demo" class="subtle-badge demo-badge">演示数据</span><button class="refresh-primary" :disabled="loading" @click="refreshReading"><RefreshCw :size="16" :class="{ spinning: loading }" />{{ loading ? '正在刷新' : '刷新' }}</button><button class="quiet-button" @click="emit('logout')"><LogOut :size="16" />退出登录</button></div></header>
-      <template v-if="active === '仪表板'"><section v-if="!dashboardDormitory" class="setup-empty"><Settings :size="22" /><div><h2>先设置你的宿舍</h2><p>完成校区、楼栋、楼层和宿舍选择后，面板将直接展示该宿舍的用电情况。</p></div><button class="primary-button" @click="active = '设置'">前往设置</button></section><template v-else><p v-if="error" class="inline-error query-error">{{ error }}</p><MetricOverview :reading="reading" :loading="loading" /><section class="data-section alert-section"><header class="section-header"><div><h2>用电预警</h2><p>基于最近一次真实查询</p></div></header><p v-if="!alertSettings?.enabled" class="muted">预警功能当前已关闭</p><p v-else-if="!alerts.length" class="muted">当前用电状态正常</p><div v-for="alert in alertSettings?.enabled ? alerts : []" :key="alert.id" class="alert-item" :class="alert.level"><strong>{{ alert.title }}</strong><span>{{ alert.message }}</span></div></section><ElectricityHeatmap :daily-usage="demo ? demoDailyUsage : Object.fromEntries((analysis?.daily_usage ?? []).map((item) => [item.date, item.usage_kwh]))" :demo="demo" /><StatisticsSummary :analysis="analysis" :daily-usage="demo ? demoDailyUsage : undefined" :demo="demo" /><div class="trends"><UsageTrendChart :records="history" field="total_usage_kwh" title="累计用电趋势" unit="kWh" /><UsageTrendChart :records="history" field="remaining_money" title="余额趋势" unit="元" /></div></template></template>
+      <template v-if="active === '仪表板'"><section v-if="!dashboardDormitory" class="setup-empty"><Settings :size="22" /><div><h2>先设置你的宿舍</h2><p>完成校区、楼栋、楼层和宿舍选择后，面板将直接展示该宿舍的用电情况。</p></div><button class="primary-button" @click="active = '设置'">前往设置</button></section><template v-else><p v-if="error" class="inline-error query-error">{{ error }}</p><MetricOverview :reading="reading" :loading="loading" /><section class="data-section alert-section"><header class="section-header"><div><h2>用电预警</h2><p>基于最近一次真实查询</p></div></header><p v-if="!alertSettings" class="muted">正在读取预警设置…</p><p v-else-if="!alertSettings.enabled" class="muted">预警功能当前已关闭</p><p v-else-if="!alerts.length" class="muted">当前用电状态正常</p><div v-for="alert in alertSettings?.enabled ? alerts : []" :key="alert.id" class="alert-item" :class="alert.level"><strong>{{ alert.title }}</strong><span>{{ alert.message }}</span></div></section><ElectricityHeatmap :daily-usage="demo ? demoDailyUsage : Object.fromEntries((analysis?.daily_usage ?? []).map((item) => [item.date, item.usage_kwh]))" :demo="demo" /><StatisticsSummary :analysis="analysis" :daily-usage="demo ? demoDailyUsage : undefined" :demo="demo" /><div class="trends"><UsageTrendChart :records="history" field="total_usage_kwh" title="累计用电趋势" unit="kWh" /><UsageTrendChart :records="history" field="remaining_money" title="余额趋势" unit="元" /></div></template></template>
       <SettingsView v-else-if="active === '设置'" @back="returnToDashboard" @saved="settingsSaved" />
       <AstrBotView v-else-if="active === 'AstrBot 接入'" @back="returnToDashboard" @configure="active = '设置'" />
     </main>
