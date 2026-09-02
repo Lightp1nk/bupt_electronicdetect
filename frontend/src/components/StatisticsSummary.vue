@@ -19,7 +19,7 @@ const values = () => {
   const avg = (days: number) => (data.slice(-days).reduce((sum, value) => sum + value, 0) / Math.min(days, data.length)).toFixed(1)
   return [`${data[data.length - 1]?.toFixed(1)} kWh`, `${avg(3)} kWh`, `${avg(7)} kWh`, '约 38 天']
 }
-const items = ['今日用电', '近 3 日平均', '近 7 日平均', '预计可用']
+const items = ['今日用电', '近 3 日平均', '近 7 日平均', '预计可用时间']
 </script>
 
 <template>
