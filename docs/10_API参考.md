@@ -20,6 +20,14 @@
 
 `/collection/settings`（GET/PUT/DELETE）、`/collection/status`（GET）、`/collection/run`（POST）均只作用于当前用户。
 
+当前用户采集控制接口：
+* `GET /api/v1/electricity/collection/settings`
+* `PUT /api/v1/electricity/collection/settings`
+* `DELETE /api/v1/electricity/collection/settings`
+* `GET /api/v1/electricity/collection/status`
+* `POST /api/v1/electricity/collection/run`
+
+
 ## Alert 与通知 API
 
 | 路径 | 说明 |
@@ -43,4 +51,3 @@ AstrBot Internal API 不能由浏览器调用，需 `Authorization: Bearer <ASTR
 | POST | `/api/internal/chat/electricity/summary` | 按 QQ 身份读取已采集摘要 |
 
 完整字段以 FastAPI OpenAPI 文档和 `app/schemas/` 为准。
-
