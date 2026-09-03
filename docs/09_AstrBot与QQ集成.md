@@ -34,4 +34,3 @@ FastAPI 不保存 UMO，也不调用 AstrBot 官方 IM API。
 - Bridge 方向使用独立 Bridge Token。
 - 插件不保存北邮账号、密码、Cookie、FastAPI 浏览器 Session 或 AstrBot API Key。
 - QQ 命令只能基于事件发送者的 QQ ID 查询对应绑定用户，不能传入任意 `user_id`。
-
